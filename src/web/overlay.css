@@ -1,0 +1,23 @@
+#SpicyLyricsWebRoot {
+  position: fixed;
+  z-index: 9999;
+  inset: 0 0 88px 0;
+  display: none;
+  background: #000;
+}
+
+#SpicyLyricsWebRoot.is-open {
+  display: block;
+}
+
+#SpicyLyricsWebRoot .main-view-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+#SpicyLyricsWebRoot #SpicyLyricsPage {
+  width: 100%;
+  height: 100%;
+}

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Spicy Lyrics Web</title>
+    <link rel="stylesheet" href="options.css">
+  </head>
+  <body>
+    <main>
+      <h1>Spicy Lyrics Web</h1>
+      <p>This panel uses the public <a href="https://developers.spicylyrics.org/docs">Spicy Lyrics API</a>. Create an application, turn on client access, and allowlist the origin below.</p>
+      <p>Extension origin</p>
+      <code id="origin"></code>
+      <label for="key">Publishable key</label>
+      <input id="key" autocomplete="off" spellcheck="false" placeholder="sl_pk_...">
+      <p id="status" role="status"></p>
+      <button id="save" type="button">Save</button>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>

@@ -1,0 +1,13 @@
+{
+  "name": "spicy-lyrics-web",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Word-synced lyrics panel for Spotify Web, using the public Spicy Lyrics API.",
+  "scripts": {
+    "test": "node --test"
+  },
+  "devDependencies": {
+    "happy-dom": "^20.0.10"
+  }
+}

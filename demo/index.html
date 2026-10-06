@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Spicy Lyrics Web demo</title>
+    <link rel="stylesheet" href="../src/panel.css">
+    <style>
+      html, body { margin: 0; background: #000; }
+      #slw-root { display: block; }
+    </style>
+  </head>
+  <body>
+    <div id="slw-root" role="dialog" aria-label="Spicy Lyrics">
+      <div class="slw-backdrop"></div>
+      <div class="slw-layout">
+        <img class="slw-art" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 80 80'%3E%3Crect width='80' height='80' fill='%231a1a2e'/%3E%3Ccircle cx='40' cy='40' r='18' fill='%23ffd166'/%3E%3C/svg%3E">
+        <div class="slw-stage">
+          <header class="slw-head">
+            <div>
+              <p class="slw-title">Demo track</p>
+              <p class="slw-artist">Spicy Lyrics Web</p>
+            </div>
+          </header>
+          <div class="slw-scroll"></div>
+          <footer class="slw-credit"></footer>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="./demo.js"></script>
+  </body>
+</html>

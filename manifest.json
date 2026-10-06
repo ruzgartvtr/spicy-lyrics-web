@@ -1,0 +1,41 @@
+{
+  "manifest_version": 3,
+  "name": "Spicy Lyrics Web",
+  "version": "0.1.0",
+  "description": "Word-synced lyrics on Spotify Web, using the public Spicy Lyrics API.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyn0fK1ofi9e45DWZIwPvwwobPOb2s+mH/eptccjqLUe4koKuKvqD4Q6F7GxivHo2LIqjCUoHtEUTbPjFKvxch9OQr+5WbrEYXGk54oFnn+9+uwMsBHHvTN/TGdKINVzFWASpnl28LMA1ULtLqWqEGNJzZtImcNQ1/JKSSe4M1N/cOMWyyu7DDsXkLsKdBk0/Wd8q64Os4h1u6DXGQ5RwuCUnF1u51iCikusJZi9om1atVTzgsQd6OLkihbEj0KbLNeR+wMtZctVsqk2mRbsNgQLsSPSsTycldCZ8nxDbgcfPg0y3q+LlXUVrGt4f2XkCOOyu0hkW3plXMMfU6Vyc+QIDAQAB",
+  "permissions": ["storage"],
+  "host_permissions": [
+    "https://api.spicylyrics.org/*",
+    "https://open.spotify.com/*"
+  ],
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "Spicy Lyrics Web",
+    "default_popup": "options/popup.html"
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "commands": {
+    "toggle": {
+      "suggested_key": {
+        "default": "Alt+Shift+L"
+      },
+      "description": "Toggle the lyrics panel"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://open.spotify.com/*"],
+      "js": ["src/content.js"],
+      "css": ["src/panel.css"],
+      "run_at": "document_idle",
+      "type": "module"
+    }
+  ]
+}

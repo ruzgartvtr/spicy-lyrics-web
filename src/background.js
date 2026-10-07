@@ -70,12 +70,30 @@ export async function fetchLyrics(trackId, deps = {}) {
   return { ok: true, body };
 }
 
+async function injectIntoTab(tabId) {
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      files: ["button.js"],
+    });
+  } catch (_) {}
+}
+
 if (globalThis.chrome?.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === "toggle") return undefined;
     if (message?.type !== "lyrics") return undefined;
     fetchLyrics(message.trackId).then(sendResponse).catch(() => {
       sendResponse({ ok: false, error: "network" });
     });
     return true;
+  });
+}
+
+if (globalThis.chrome?.tabs?.onUpdated) {
+  chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+    if (info.status !== "complete") return;
+    if (!tab.url?.startsWith("https://open.spotify.com/")) return;
+    injectIntoTab(tabId);
   });
 }

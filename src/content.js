@@ -49,14 +49,6 @@ const artistEl = root.querySelector(".slw-artist");
 const artEl = root.querySelector(".slw-art");
 const creditEl = root.querySelector(".slw-credit");
 
-const toggle = document.createElement("button");
-toggle.id = "slw-toggle";
-toggle.type = "button";
-toggle.setAttribute("aria-pressed", "false");
-toggle.setAttribute("aria-label", "Spicy Lyrics");
-toggle.textContent = "Sözler";
-toggle.style.cssText = "position:fixed;right:24px;bottom:96px;z-index:2147483646;border:0;border-radius:999px;padding:12px 16px;background:#1ed760;color:#000;font:700 14px/1 Helvetica,sans-serif;cursor:pointer;";
-
 let open = sessionStorage.getItem("slw-open") === "1";
 let offsetMs = 0;
 let anchor = null;
@@ -68,15 +60,19 @@ chrome.storage.local.get("offsetMs", (stored) => {
   offsetMs = Number(stored.offsetMs) || 0;
 });
 
+function getToggle() {
+  return document.getElementById("slw-toggle");
+}
+
 function setOpen(next) {
   open = next;
   root.hidden = !open;
-  toggle.setAttribute("aria-pressed", open ? "true" : "false");
+  getToggle()?.setAttribute("aria-pressed", open ? "true" : "false");
   sessionStorage.setItem("slw-open", open ? "1" : "0");
   if (open) syncPlayer();
 }
 
-toggle.addEventListener("click", () => setOpen(!open));
+window.addEventListener("slw-toggle", () => setOpen(!open));
 root.querySelector(".slw-close").addEventListener("click", () => setOpen(false));
 root.addEventListener("click", (event) => {
   const button = event.target.closest(".slw-offset");
@@ -94,7 +90,8 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 
 function placeToggle() {
-  if (!toggle.isConnected) document.documentElement.append(toggle);
+  // button.js owns the visible control; this only keeps the pressed state in sync.
+  getToggle()?.setAttribute("aria-pressed", open ? "true" : "false");
 }
 
 function currentTime() {

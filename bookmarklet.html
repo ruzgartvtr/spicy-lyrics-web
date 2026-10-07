@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <title>Spicy Lyrics bookmarklet</title>
+    <style>
+      body { margin: 0; font: 16px/1.5 Helvetica, sans-serif; background: #121212; color: #fff; }
+      main { max-width: 640px; margin: 0 auto; padding: 48px 20px; }
+      a.bm {
+        display: inline-block; margin: 16px 0; padding: 14px 20px; border-radius: 999px;
+        background: #1ed760; color: #000; font-weight: 700; text-decoration: none;
+      }
+      code { display: block; margin-top: 24px; padding: 12px; background: #1f1f1f; border-radius: 8px; word-break: break-all; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Eklenti olmadan Sözler</h1>
+      <p>Yeşil bağlantıyı Chrome yer imleri çubuğuna sürükle. open.spotify.com'da bir şarkı çalarken yer imine tıkla.</p>
+      <a class="bm" id="link" href="#">Sözler</a>
+      <p>İlk tıklamada <code>sl_pk_</code> anahtarını sorar. Bookmarklet tarayıcıda çalıştığı için API allowlist'ine <code>https://open.spotify.com</code> ekle.</p>
+    </main>
+    <script>
+      fetch("bookmarklet.js").then((r) => r.text()).then((code) => {
+        document.getElementById("link").href = "javascript:" + encodeURIComponent(code);
+      });
+    </script>
+  </body>
+</html>

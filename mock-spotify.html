@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8">
+    <title>Mock Spotify — button test</title>
+    <style>
+      body { margin: 0; background: #121212; color: #fff; font: 16px/1.4 Helvetica, sans-serif; }
+      .bar {
+        position: fixed; left: 0; right: 0; bottom: 0; height: 88px;
+        background: #181818; display: flex; align-items: center; gap: 16px; padding: 0 24px;
+      }
+      [data-testid="now-playing-widget"] { display: flex; gap: 12px; align-items: center; }
+      [data-testid="playback-progressbar"] { flex: 1; height: 4px; background: #333; }
+    </style>
+  </head>
+  <body>
+    <main style="padding:40px">
+      <h1>Mock Spotify</h1>
+      <p>Yeşil Sözler düğmesi sağ altta görünmeli.</p>
+    </main>
+    <div class="bar">
+      <div data-testid="now-playing-widget">
+        <a href="/track/11dFghVXANMlKmJXsNCbNl"><img alt="" width="56" height="56" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Crect width='56' height='56' fill='%23333'/%3E%3C/svg%3E"></a>
+        <a data-testid="context-item-link" href="/track/11dFghVXANMlKmJXsNCbNl">Demo Track</a>
+        <span data-testid="context-item-info-artist"><a href="/artist/1">Demo Artist</a></span>
+      </div>
+      <div data-testid="player-controls">
+        <button data-testid="control-button-playpause" aria-label="Pause"></button>
+      </div>
+      <div data-testid="playback-position">0:10</div>
+      <div data-testid="playback-progressbar" aria-valuemin="0" aria-valuemax="180000" aria-valuenow="10000"></div>
+      <div data-testid="playback-duration">3:00</div>
+    </div>
+    <script src="button.js"></script>
+    <script>
+      setTimeout(() => {
+        const ok = !!document.getElementById("slw-toggle");
+        document.title = ok ? "PASS: button present" : "FAIL: no button";
+        document.querySelector("main").insertAdjacentHTML(
+          "beforeend",
+          ok
+            ? '<p style="color:#1ed760;font-size:28px;font-weight:700">PASS — Sözler düğmesi var</p>'
+            : '<p style="color:#f55;font-size:28px;font-weight:700">FAIL — düğme yok</p>'
+        );
+      }, 50);
+    </script>
+  </body>
+</html>

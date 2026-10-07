@@ -73,17 +73,9 @@ export async function fetchLyrics(trackId, deps = {}) {
 if (globalThis.chrome?.runtime?.onMessage) {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type !== "lyrics") return undefined;
-    fetchLyrics(message.trackId).then(sendResponse);
-    return true;
-  });
-
-  chrome.commands?.onCommand.addListener(async (command) => {
-    if (command !== "toggle") return;
-    const [tab] = await chrome.tabs.query({
-      active: true,
-      lastFocusedWindow: true,
-      url: "https://open.spotify.com/*",
+    fetchLyrics(message.trackId).then(sendResponse).catch(() => {
+      sendResponse({ ok: false, error: "network" });
     });
-    if (tab?.id) chrome.tabs.sendMessage(tab.id, { type: "toggle" });
+    return true;
   });
 }

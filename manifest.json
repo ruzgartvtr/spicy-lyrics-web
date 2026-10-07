@@ -21,14 +21,6 @@
     "page": "options/options.html",
     "open_in_tab": true
   },
-  "commands": {
-    "toggle": {
-      "suggested_key": {
-        "default": "Alt+Shift+L"
-      },
-      "description": "Toggle the lyrics panel"
-    }
-  },
   "content_scripts": [
     {
       "matches": ["https://open.spotify.com/*"],

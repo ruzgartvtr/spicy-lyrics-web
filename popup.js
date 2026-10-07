@@ -53,23 +53,22 @@ openBtn.addEventListener("click", async () => {
       return;
     }
 
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      files: ["button.js", "dist/spicy-lyrics.web.js"],
-    });
-
-    await chrome.scripting.executeScript({
-      target: { tabId: tab.id },
-      world: "ISOLATED",
-      func: () => {
-        if (typeof window.__SL_open === "function") window.__SL_open();
-        else if (typeof window.__SL_toggle === "function") window.__SL_toggle();
-        else window.dispatchEvent(new CustomEvent("slw-open"));
-      },
-    });
+    // Prefer messaging the already-injected content script (force open, never toggle).
+    try {
+      await chrome.tabs.sendMessage(tab.id, { type: "slw-force-open" });
+    } catch {
+      await chrome.scripting.executeScript({
+        target: { tabId: tab.id },
+        world: "ISOLATED",
+        func: () => {
+          if (typeof window.__SL_open === "function") window.__SL_open();
+          else window.dispatchEvent(new CustomEvent("slw-force-open"));
+        },
+      });
+    }
 
     await chrome.tabs.update(tab.id, { active: true });
-    status.textContent = "Açıldı. Spotify sekmesine bak.";
+    status.textContent = "Açıldı. Spotify'da siyah sözler ekranı gelmeli.";
   } catch (error) {
     status.textContent = `Açılamadı: ${error instanceof Error ? error.message : String(error)}`;
   }

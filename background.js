@@ -1,3 +1,7 @@
+const lyricsCache = new Map();
+const lyricsInflight = new Map();
+const CACHE_TTL_MS = 30 * 60 * 1000;
+
 async function seedLocalDefaults() {
   try {
     const response = await fetch(chrome.runtime.getURL("local-defaults.json"));
@@ -6,12 +10,18 @@ async function seedLocalDefaults() {
     const key = String(data?.publishableKey || "").trim();
     if (!key.startsWith("sl_pk_")) return;
     const stored = await chrome.storage.local.get("publishableKey");
-    if (!stored.publishableKey) {
+    if (!String(stored.publishableKey || "").trim()) {
       await chrome.storage.local.set({ publishableKey: key });
     }
   } catch {
-    // local-defaults.json is optional / gitignored
+    // optional
   }
+}
+
+async function readPublishableKey() {
+  await seedLocalDefaults();
+  const stored = await chrome.storage.local.get("publishableKey");
+  return String(stored.publishableKey || "").trim();
 }
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -19,28 +29,35 @@ chrome.runtime.onInstalled.addListener(() => {
 });
 void seedLocalDefaults();
 
+async function fetchLyricsNetwork(trackId, key) {
+  const response = await fetch(`https://api.spicylyrics.org/v1/lyrics/${encodeURIComponent(trackId)}`, {
+    headers: {
+      Authorization: `Bearer ${key}`,
+      Accept: "application/json",
+    },
+  });
+  const body = await response.text();
+  return { ok: response.ok, status: response.status, body };
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type === "slw-open" || message?.type === "toggle") {
-    const tabId = sender.tab?.id;
+  if (message?.type === "slw-force-open" || message?.type === "slw-open") {
+    const tabId = sender.tab?.id ?? message.tabId;
     if (tabId != null) {
-      chrome.tabs.sendMessage(tabId, { type: "slw-open" }).catch(() => {});
-      chrome.scripting
-        .executeScript({
-          target: { tabId },
-          world: "ISOLATED",
-          func: () => {
-            try {
-              if (typeof window.__SL_toggle === "function") {
-                window.__SL_toggle();
-                return;
-              }
-            } catch (_) {}
-            window.dispatchEvent(new CustomEvent("slw-open"));
-            const root = document.getElementById("SpicyLyricsWebRoot");
-            if (root) root.classList.toggle("is-open");
-          },
-        })
-        .catch(() => {});
+      chrome.tabs
+        .sendMessage(tabId, { type: "slw-force-open" })
+        .catch(() => {
+          chrome.scripting
+            .executeScript({
+              target: { tabId },
+              world: "ISOLATED",
+              func: () => {
+                if (typeof window.__SL_open === "function") window.__SL_open();
+                else window.dispatchEvent(new CustomEvent("slw-force-open"));
+              },
+            })
+            .catch(() => {});
+        });
     }
     sendResponse({ ok: true });
     return true;
@@ -52,37 +69,50 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message?.type !== "spicy-lyrics-proxy") return undefined;
-  if (typeof message.url !== "string" || !message.url.startsWith("https://api.spicylyrics.org/")) {
-    sendResponse({ status: 400, body: "" });
-    return undefined;
-  }
-  // Never proxy the desktop /query endpoint from the browser — it always 418s.
-  if (message.url.includes("/query")) {
-    sendResponse({ status: 418, body: "{\"error\":\"web-port-skips-query\"}" });
-    return undefined;
+  if (message?.type === "fetch-lyrics") {
+    const trackId = String(message.trackId || "");
+    if (!/^[A-Za-z0-9]{10,40}$/.test(trackId)) {
+      sendResponse({ ok: false, status: 400, error: "bad-track", body: "" });
+      return true;
+    }
+
+    const cached = lyricsCache.get(trackId);
+    if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+      sendResponse({ ...cached.value, cached: true });
+      return true;
+    }
+
+    const existing = lyricsInflight.get(trackId);
+    if (existing) {
+      existing.then(sendResponse).catch(() => sendResponse({ ok: false, status: 0, error: "network", body: "" }));
+      return true;
+    }
+
+    const pending = readPublishableKey()
+      .then(async (key) => {
+        if (!key || key.startsWith("sl_sk_")) {
+          return { ok: false, status: 401, error: "web-key", body: "" };
+        }
+        try {
+          const value = await fetchLyricsNetwork(trackId, key);
+          if (value.ok || value.status === 404) {
+            lyricsCache.set(trackId, { at: Date.now(), value });
+          }
+          return value;
+        } catch {
+          return { ok: false, status: 0, error: "network", body: "" };
+        }
+      })
+      .finally(() => {
+        lyricsInflight.delete(trackId);
+      });
+
+    lyricsInflight.set(trackId, pending);
+    pending.then(sendResponse);
+    return true;
   }
 
-  fetch(message.url, {
-    method: message.method || "GET",
-    headers: message.headers || {},
-    body: message.body,
-  })
-    .then(async (response) => {
-      try {
-        sendResponse({ status: response.status, body: await response.text() });
-      } catch {
-        // Tab closed before response.
-      }
-    })
-    .catch(() => {
-      try {
-        sendResponse({ status: 0, body: "" });
-      } catch {
-        // Tab closed before response.
-      }
-    });
-  return true;
+  return undefined;
 });
 
 chrome.tabs.onUpdated.addListener((tabId, info, tab) => {

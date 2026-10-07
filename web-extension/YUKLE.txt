@@ -1,15 +1,24 @@
-Spicy Lyrics Web — yükleme
+Spicy Lyrics Web — yükleme + API allowlist
 
-1) chrome://extensions
-2) Developer mode AÇ
-3) Varsa eski "Spicy Lyrics Web" eklentisini Remove et
-4) Load unpacked → bu klasörü seç:
-   /Users/ruzgar/Desktop/GitHub/spicy-lyrics-src/web-extension
-5) open.spotify.com sayfasını hard refresh (Cmd+Shift+R)
-6) Sağ alttaki yeşil "Sözler" butonuna bas
+1) chrome://extensions → Developer mode → Load unpacked
+   Klasör: /Users/ruzgar/Desktop/GitHub/spicy-lyrics-src/web-extension
 
-API anahtarı (sl_pk_...): eklenti ikonuna tıkla → kaydet
+2) developers.spicylyrics.org → uygulaman → Allowed origins
 
-Sorun giderme:
-- Buton "Yükleniyor…" derse 2 sn bekle, tekrar bas
-- Kırmızı hata kutusu çıkarsa metni kopyala
+   Add (aynen şöyle, örnek domain KOYMA):
+   chrome-extension://jfhplaabgooiknhchiegghccnboahmfp
+
+   İstersen ekle (content-script Origin’i bazen budur):
+   https://open.spotify.com
+
+   "Allow requests with no Origin header" → AÇIK (ON)
+   Çünkü lyrics isteği eklenti background’undan gider; Origin gönderilmez.
+   https://example.com yazma — o sadece dokümantasyon örneği.
+
+3) Eklenti ikonuna tıkla → sl_pk_ anahtarını kaydet
+
+4) open.spotify.com → hard refresh → yeşil Sözler / otomatik açılış
+
+Konsolda şunları yok say:
+- chrome-extension://kpmbpdpbjj…/popup.js  → başka eklenti
+- sentry / spclient 404 / preload uyarısı → Spotify

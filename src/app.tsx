@@ -1120,6 +1120,17 @@ async function main() {
         } catch {
           // ignore
         }
+        // First successful boot: open once so the user sees the page without fighting toggles.
+        if (!(window as any).__SL_AUTOOPENED__) {
+          (window as any).__SL_AUTOOPENED__ = true;
+          window.setTimeout(() => {
+            try {
+              openIntoWebRoot();
+            } catch (error) {
+              console.warn("Spicy Lyrics auto-open failed", error);
+            }
+          }, 300);
+        }
       }
 
       Global.Event.listen("session:navigation", (data: Location) => {

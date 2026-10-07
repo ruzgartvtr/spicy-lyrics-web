@@ -71,9 +71,13 @@ function installFetchProxy() {
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     if (!url.startsWith("https://api.spicylyrics.org/")) return nativeFetch(input, init);
-    // Desktop session/query always 418 in browsers — never wake the SW for it.
-    if (url.includes("/query")) {
-      return new Response(JSON.stringify({ error: "web-port-skips-query" }), { status: 418 });
+    // Only the public lyrics endpoint is proxied. Everything else (esp. /query)
+    // would 418 and spam "message port closed" when the service worker sleeps.
+    if (!url.includes("/v1/lyrics/")) {
+      if (url.includes("/query")) {
+        return new Response(JSON.stringify({ error: "web-port-skips-query" }), { status: 418 });
+      }
+      return new Response("", { status: 204 });
     }
     const headers: Record<string, string> = {};
     new Headers(init?.headers).forEach((value, key) => {
@@ -81,6 +85,12 @@ function installFetchProxy() {
     });
     try {
       const proxied = await new Promise<{ body?: string; status?: number } | undefined>((resolve) => {
+        let settled = false;
+        const finish = (value?: { body?: string; status?: number }) => {
+          if (settled) return;
+          settled = true;
+          resolve(value);
+        };
         try {
           chromeApi.runtime.sendMessage(
             {
@@ -92,12 +102,13 @@ function installFetchProxy() {
             },
             (response: { body?: string; status?: number } | undefined) => {
               void chromeApi.runtime.lastError;
-              resolve(response);
+              finish(response);
             },
           );
         } catch {
-          resolve(undefined);
+          finish(undefined);
         }
+        setTimeout(() => finish(undefined), 15000);
       });
       return new Response(proxied?.body ?? "", { status: proxied?.status || 0 });
     } catch {

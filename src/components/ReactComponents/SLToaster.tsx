@@ -11,6 +11,12 @@ export default function SLToaster() {
   const isGlobalNav = useStore($isGlobalNav);
 
   useEffect(() => {
+    // Web port: Spotify Web's player chrome doesn't expose the desktop bar class.
+    if ((globalThis as any).__SL_WEB__) {
+      setNowPlayingBarHeight(88);
+      return;
+    }
+
     // Spotify 1.3.x drops the mapped class; the wrapper is still the bar's parent.
     const targetElement =
       document.querySelector<HTMLElement>(".Root__now-playing-bar") ??

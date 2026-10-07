@@ -19,6 +19,7 @@
       <p>The desktop extension's internal API refuses browsers. This port keeps the Spicy Lyrics source and loads lyrics from the public API.</p>
       <p>Create an application at <a href="https://developers.spicylyrics.org/docs">developers.spicylyrics.org</a>, turn on client access, and allowlist:</p>
       <code id="origin"></code>
+      <p>Also turn ON <strong>Allow requests with no Origin header</strong> (background proxy has no Origin). Optionally add <code>https://open.spotify.com</code>. Do not add <code>https://example.com</code>.</p>
       <label for="key">Publishable key</label>
       <input id="key" autocomplete="off" spellcheck="false" placeholder="sl_pk_...">
       <p id="status" role="status"></p>

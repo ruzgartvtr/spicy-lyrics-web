@@ -41,8 +41,3 @@
   background: #1ed760;
 }
 
-body > #slw-open-button {
-  position: fixed;
-  right: 24px;
-  bottom: 96px;
-}

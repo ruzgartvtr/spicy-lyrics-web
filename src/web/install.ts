@@ -92,14 +92,18 @@ function installFetchProxy() {
 }
 
 export function installWebSpicetify() {
+  if ((globalThis as any).__SL_WEB__) return;
   (globalThis as any).__SL_WEB__ = true;
   installFetchProxy();
 
-  const root = document.createElement("div");
-  root.id = "SpicyLyricsWebRoot";
-  root.className = "Root__main-view";
-  root.innerHTML = `<div class="main-view-container"><div class="main-view-container__scroll-node-child"></div></div>`;
-  document.documentElement.append(root);
+  let root = document.getElementById("SpicyLyricsWebRoot") as HTMLDivElement | null;
+  if (!root) {
+    root = document.createElement("div");
+    root.id = "SpicyLyricsWebRoot";
+    root.className = "Root__main-view";
+    root.innerHTML = `<div class="main-view-container"><div class="main-view-container__scroll-node-child"></div></div>`;
+    document.documentElement.append(root);
+  }
 
   const listeners = new Map<string, Set<PlayerListener>>();
   const historyListeners = new Set<(location: { pathname: string }) => void>();
@@ -272,40 +276,23 @@ export function installWebSpicetify() {
   poll();
   setInterval(poll, 200);
 
-  const openButton = document.createElement("button");
-  openButton.id = "slw-open-button";
-  openButton.type = "button";
-  openButton.textContent = "Sözler";
-  openButton.setAttribute("aria-pressed", "false");
+  const openLyrics = () => {
+    history.push({ pathname: "/SpicyLyrics" });
+  };
   const toggleLyrics = () => {
     if (history.location.pathname === "/SpicyLyrics") history.goBack();
-    else history.push({ pathname: "/SpicyLyrics" });
+    else openLyrics();
   };
-  openButton.addEventListener("click", (event) => {
-    event.stopPropagation();
-    toggleLyrics();
-  });
   const syncOpenButton = () => {
     const open = history.location.pathname === "/SpicyLyrics";
-    openButton.setAttribute("aria-pressed", open ? "true" : "false");
+    document.getElementById("slw-open-button")?.setAttribute("aria-pressed", open ? "true" : "false");
   };
   const originalPush = history.push.bind(history);
   history.push = (next: { pathname: string }) => {
     originalPush(next);
     syncOpenButton();
   };
-  openButton.style.cssText = "position:fixed;right:24px;bottom:96px;z-index:2147483646;border:0;border-radius:999px;padding:12px 16px;background:#1ed760;color:#000;font:700 14px/1 Helvetica,sans-serif;cursor:pointer;";
-  const placeOpenButton = () => {
-    if (!openButton.isConnected) document.documentElement.append(openButton);
-  };
-  placeOpenButton();
-  let placing = false;
-  new MutationObserver(() => {
-    if (placing || openButton.isConnected) return;
-    placing = true;
-    requestAnimationFrame(() => {
-      placing = false;
-      placeOpenButton();
-    });
-  }).observe(document.documentElement, { childList: true, subtree: true });
+  (window as any).__SL_open = openLyrics;
+  (window as any).__SL_toggle = toggleLyrics;
+  window.addEventListener("slw-open", toggleLyrics);
 }

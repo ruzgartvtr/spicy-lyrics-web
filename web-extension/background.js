@@ -23,3 +23,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   });
   return true;
 });
+
+chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
+  if (info.status !== "complete") return;
+  if (!tab.url?.startsWith("https://open.spotify.com/")) return;
+  chrome.scripting.executeScript({
+    target: { tabId },
+    files: ["button.js"],
+  }).catch(() => {});
+});

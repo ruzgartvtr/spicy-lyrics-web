@@ -1,19 +1,27 @@
 <!doctype html>
-<html lang="en">
+<html lang="tr">
   <head>
     <meta charset="utf-8">
-    <title>Spicy Lyrics Web</title>
+    <title>Spicy Lyrics</title>
     <style>
-      body { margin: 0; width: 280px; font: 14px/1.4 "Helvetica Neue", sans-serif; background: #121212; color: #fff; }
+      body { margin: 0; width: 280px; font: 14px/1.4 Helvetica, sans-serif; background: #121212; color: #fff; }
       main { padding: 16px; }
-      a { color: #ffd166; }
+      button {
+        width: 100%; border: 0; border-radius: 999px; padding: 14px 16px;
+        background: #1ed760; color: #000; font: 700 15px/1 Helvetica, sans-serif; cursor: pointer;
+      }
+      button:disabled { opacity: 0.5; }
+      p { margin: 12px 0 0; color: #b3b3b3; }
+      a { color: #1ed760; }
+      #status { min-height: 1.2em; color: #ffd166; }
     </style>
   </head>
   <body>
     <main>
-      <strong>Spicy Lyrics</strong>
-      <p>Spotify Web’de oynatıcıdaki Sözler düğmesi paneli açar.</p>
-      <p><a id="options" href="options.html">Extension options</a></p>
+      <button id="open" type="button">Spicy Lyrics'i aç</button>
+      <p id="status"></p>
+      <p>Bu, Spicy Lyrics masaüstü kodunun web portudur. open.spotify.com sekmesindeyken bas.</p>
+      <p><a id="options" href="options.html">sl_pk_ anahtarı</a></p>
     </main>
     <script src="popup.js"></script>
   </body>

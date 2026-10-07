@@ -1142,7 +1142,9 @@ async function main() {
           setTimeout(CheckForUpdates_Intervaled, jitter(120 * 1000, 0.2));
         }
       };
-      setTimeout(async () => await CheckForUpdates_Intervaled(), 1000);
+      if (!(globalThis as any).__SL_WEB__) {
+        setTimeout(async () => await CheckForUpdates_Intervaled(), 1000);
+      }
     }
   };
 

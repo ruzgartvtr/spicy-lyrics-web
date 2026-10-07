@@ -1,5 +1,7 @@
-node_modules/
-.DS_Store
 
+.DS_Store
 dist/
+dist/*.map
+node_modules
+node_modules/
 test-button.html

@@ -42009,17 +42009,18 @@ ${bgTextLines.join("\n")}` : francText;
   var _HTMLGenericModal, PopupModal;
   var init_Modal = __esm({
     "src/components/Modal.ts"() {
-      _HTMLGenericModal = class extends HTMLElement {
+      _HTMLGenericModal = class {
+        root;
         _onClose;
         _currentModalId;
         constructor() {
-          super();
-          this.classList.add("SpicyLyricsModal");
+          this.root = document.createElement("div");
+          this.root.classList.add("SpicyLyricsModal");
           this._onClose = null;
           this._currentModalId = null;
         }
         _applyModalId(modalId) {
-          const modalEl = this.querySelector(".sl-modal");
+          const modalEl = this.root.querySelector(".sl-modal");
           if (this._currentModalId && modalEl) {
             modalEl.classList.remove(this._currentModalId);
           }
@@ -42035,13 +42036,13 @@ ${bgTextLines.join("\n")}` : francText;
           this._currentModalId = null;
           const _removeFromDom = (timeoutDuration) => {
             setTimeout(() => {
-              this?.remove();
+              this.root.remove();
               if (typeof capturedOnClose === "function") {
                 capturedOnClose();
               }
             }, timeoutDuration);
           };
-          const genericModal = this?.querySelector(".sl-modal-overlay-animated");
+          const genericModal = this.root.querySelector(".sl-modal-overlay-animated");
           if (genericModal) {
             genericModal.classList.remove("Active");
             _removeFromDom(0.22 * 1e3 + 30);
@@ -42058,16 +42059,16 @@ ${bgTextLines.join("\n")}` : francText;
             this._onClose();
           }
           this._onClose = onClose;
-          const closeButton = this.querySelector(".sl-modal-close-btn");
+          const closeButton = this.root.querySelector(".sl-modal-close-btn");
           if (closeButton) {
             closeButton.onclick = closeHandler ?? this.hide.bind(this);
           }
           if (typeof title === "string") {
-            const titleEl = this.querySelector(".sl-modal-title");
+            const titleEl = this.root.querySelector(".sl-modal-title");
             if (titleEl) titleEl.textContent = title;
           }
           this._applyModalId(modalId);
-          const main2 = this.querySelector("main");
+          const main2 = this.root.querySelector("main");
           if (main2) {
             main2.innerHTML = "";
             if (typeof content === "string") {
@@ -42079,21 +42080,23 @@ ${bgTextLines.join("\n")}` : francText;
         }
         /**
          * Display the modal.
-         * @param {Object} options
-         * @param {string} options.title
-         * @param {any} options.content
-         * @param {boolean} [options.isLarge]
-         * @param {function} [options.onClose] - Optional callback to run when modal is closed
-         * @param {boolean} [options.closeBtn=true] - Show modal close button
-         * @param {boolean} [options.closeOnOutsideClick=true] - Allow closing modal by clicking outside
          */
-        display({ title, content, isLarge = false, onClose = null, closeBtn = true, closeOnOutsideClick = true, closeHandler = null, modalId = null }) {
+        display({
+          title,
+          content,
+          isLarge = false,
+          onClose = null,
+          closeBtn = true,
+          closeOnOutsideClick = true,
+          closeHandler = null,
+          modalId = null
+        }) {
           if (typeof this._onClose === "function") {
             this._onClose();
           }
           this._onClose = onClose;
           this._currentModalId = null;
-          this.innerHTML = `
+          this.root.innerHTML = `
 <div class="sl-modal-overlay sl-modal-overlay-animated" style="z-index: 100;">
 	<div class="sl-modal" tabindex="-1" role="dialog" aria-label="${title}" aria-modal="true">
 		<div class="${isLarge ? "sl-modal-container-large" : "sl-modal-container"}">
@@ -42107,14 +42110,14 @@ ${bgTextLines.join("\n")}` : francText;
 		</div>
 	</div>
 </div>`;
-          const closeButton = this.querySelector("button");
+          const closeButton = this.root.querySelector("button");
           if (closeButton) {
             closeButton.onclick = closeHandler ?? this.hide.bind(this);
           }
           this._applyModalId(modalId);
-          const main2 = this.querySelector("main");
+          const main2 = this.root.querySelector("main");
           const hidePopup = closeHandler ?? this.hide.bind(this);
-          const overlay = this.querySelector(".sl-modal-overlay");
+          const overlay = this.root.querySelector(".sl-modal-overlay");
           if (overlay) {
             overlay.addEventListener("click", (event) => {
               if (closeOnOutsideClick && event.target === event.currentTarget) hidePopup();
@@ -42129,18 +42132,13 @@ ${bgTextLines.join("\n")}` : francText;
               main2.append(String(content));
             }
           }
-          document.body.append(this);
+          document.body.append(this.root);
           setTimeout(() => {
-            const genericModal = this.querySelector(".sl-modal-overlay-animated");
+            const genericModal = this.root.querySelector(".sl-modal-overlay-animated");
             if (genericModal) genericModal.classList.add("Active");
           }, 50);
         }
       };
-      if (typeof customElements !== "undefined" && customElements && typeof customElements.define === "function") {
-        if (!customElements.get("sl-generic-modal")) {
-          customElements.define("sl-generic-modal", _HTMLGenericModal);
-        }
-      }
       PopupModal = new _HTMLGenericModal();
     }
   });
@@ -51783,29 +51781,9 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
       return new Response(proxied?.body ?? "", { status: proxied?.status || 0 });
     });
   }
-  function ensureCustomElements() {
-    if (typeof customElements !== "undefined" && customElements && typeof customElements.define === "function") {
-      return;
-    }
-    const registry = /* @__PURE__ */ new Map();
-    globalThis.customElements = {
-      define(name, ctor) {
-        registry.set(name, ctor);
-      },
-      get(name) {
-        return registry.get(name);
-      },
-      whenDefined(_name) {
-        return Promise.resolve();
-      },
-      upgrade(_element) {
-      }
-    };
-  }
   function installWebSpicetify() {
     if (globalThis.__SL_WEB__) return;
     globalThis.__SL_WEB__ = true;
-    ensureCustomElements();
     installFetchProxy();
     let root2 = document.getElementById("SpicyLyricsWebRoot");
     if (!root2) {

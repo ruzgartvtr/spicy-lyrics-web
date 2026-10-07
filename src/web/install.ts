@@ -91,32 +91,9 @@ function installFetchProxy() {
   }) as typeof fetch;
 }
 
-function ensureCustomElements() {
-  if (typeof customElements !== "undefined" && customElements && typeof customElements.define === "function") {
-    return;
-  }
-  const registry = new Map<string, CustomElementConstructor>();
-  (globalThis as any).customElements = {
-    define(name: string, ctor: CustomElementConstructor) {
-      registry.set(name, ctor);
-    },
-    get(name: string) {
-      return registry.get(name);
-    },
-    whenDefined() {
-      return Promise.resolve();
-    },
-    upgrade() {},
-    get get() {
-      return (name: string) => registry.get(name);
-    },
-  };
-}
-
 export function installWebSpicetify() {
   if ((globalThis as any).__SL_WEB__) return;
   (globalThis as any).__SL_WEB__ = true;
-  ensureCustomElements();
   installFetchProxy();
 
   let root = document.getElementById("SpicyLyricsWebRoot") as HTMLDivElement | null;

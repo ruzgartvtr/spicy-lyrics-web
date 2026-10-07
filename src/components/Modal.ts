@@ -21,19 +21,24 @@ type ModalTransitionOptions = {
 	title?: string | null;
 };
 
-class _HTMLGenericModal extends HTMLElement {
+/**
+ * Modal host. Uses a plain div instead of a custom element so the web content-script
+ * world can construct it (HTMLElement subclasses throw Illegal constructor there).
+ */
+class _HTMLGenericModal {
+	private readonly root: HTMLDivElement;
 	private _onClose: (() => void) | null;
 	private _currentModalId: string | null;
 
 	constructor() {
-		super();
-		this.classList.add("SpicyLyricsModal");
+		this.root = document.createElement("div");
+		this.root.classList.add("SpicyLyricsModal");
 		this._onClose = null;
 		this._currentModalId = null;
 	}
 
 	private _applyModalId(modalId: string | null | undefined): void {
-		const modalEl = this.querySelector(".sl-modal");
+		const modalEl = this.root.querySelector(".sl-modal");
 		if (this._currentModalId && modalEl) {
 			modalEl.classList.remove(this._currentModalId);
 		}
@@ -45,25 +50,25 @@ class _HTMLGenericModal extends HTMLElement {
 	}
 
 	hide(): void {
-        const capturedOnClose = this._onClose;
-        this._onClose = null;
-        this._currentModalId = null;
-        const _removeFromDom = (timeoutDuration: number) => {
-            setTimeout(() => {
-                this?.remove();
-                if (typeof capturedOnClose === "function") {
-                    capturedOnClose();
-                }
-            }, timeoutDuration)
-        };
+		const capturedOnClose = this._onClose;
+		this._onClose = null;
+		this._currentModalId = null;
+		const _removeFromDom = (timeoutDuration: number) => {
+			setTimeout(() => {
+				this.root.remove();
+				if (typeof capturedOnClose === "function") {
+					capturedOnClose();
+				}
+			}, timeoutDuration);
+		};
 
-        const genericModal = this?.querySelector(".sl-modal-overlay-animated");
-        if (genericModal) {
-            genericModal.classList.remove("Active");
-            _removeFromDom((0.22 * 1000) + 30);
-        } else {
-            _removeFromDom(0);
-        }
+		const genericModal = this.root.querySelector(".sl-modal-overlay-animated");
+		if (genericModal) {
+			genericModal.classList.remove("Active");
+			_removeFromDom(0.22 * 1000 + 30);
+		} else {
+			_removeFromDom(0);
+		}
 	}
 
 	/**
@@ -75,16 +80,16 @@ class _HTMLGenericModal extends HTMLElement {
 			this._onClose();
 		}
 		this._onClose = onClose;
-		const closeButton = this.querySelector(".sl-modal-close-btn");
+		const closeButton = this.root.querySelector(".sl-modal-close-btn");
 		if (closeButton) {
 			(closeButton as HTMLButtonElement).onclick = closeHandler ?? this.hide.bind(this);
 		}
 		if (typeof title === "string") {
-			const titleEl = this.querySelector(".sl-modal-title");
+			const titleEl = this.root.querySelector(".sl-modal-title");
 			if (titleEl) titleEl.textContent = title;
 		}
 		this._applyModalId(modalId);
-		const main = this.querySelector("main");
+		const main = this.root.querySelector("main");
 		if (main) {
 			main.innerHTML = "";
 			if (typeof content === "string") {
@@ -97,23 +102,23 @@ class _HTMLGenericModal extends HTMLElement {
 
 	/**
 	 * Display the modal.
-	 * @param {Object} options
-	 * @param {string} options.title
-	 * @param {any} options.content
-	 * @param {boolean} [options.isLarge]
-	 * @param {function} [options.onClose] - Optional callback to run when modal is closed
-	 * @param {boolean} [options.closeBtn=true] - Show modal close button
-	 * @param {boolean} [options.closeOnOutsideClick=true] - Allow closing modal by clicking outside
 	 */
-	display({ title, content, isLarge = false, onClose = null, closeBtn = true, closeOnOutsideClick = true, closeHandler = null, modalId = null }: ModalDisplayOptions): void {
-		// If a previous onClose exists, call it before displaying a new popup
+	display({
+		title,
+		content,
+		isLarge = false,
+		onClose = null,
+		closeBtn = true,
+		closeOnOutsideClick = true,
+		closeHandler = null,
+		modalId = null,
+	}: ModalDisplayOptions): void {
 		if (typeof this._onClose === "function") {
 			this._onClose();
 		}
 		this._onClose = onClose;
-		// Reset tracked modalId since innerHTML below replaces the previous `.sl-modal` element.
 		this._currentModalId = null;
-		this.innerHTML = `
+		this.root.innerHTML = `
 <div class="sl-modal-overlay sl-modal-overlay-animated" style="z-index: 100;">
 	<div class="sl-modal" tabindex="-1" role="dialog" aria-label="${title}" aria-modal="true">
 		<div class="${isLarge ? "sl-modal-container-large" : "sl-modal-container"}">
@@ -128,16 +133,15 @@ class _HTMLGenericModal extends HTMLElement {
 	</div>
 </div>`;
 
-		const closeButton = this.querySelector("button");
+		const closeButton = this.root.querySelector("button");
 		if (closeButton) {
 			(closeButton as HTMLButtonElement).onclick = closeHandler ?? this.hide.bind(this);
 		}
 		this._applyModalId(modalId);
-		const main = this.querySelector("main");
+		const main = this.root.querySelector("main");
 		const hidePopup = closeHandler ?? this.hide.bind(this);
 
-		// Listen for click events on Overlay
-		const overlay = this.querySelector(".sl-modal-overlay");
+		const overlay = this.root.querySelector(".sl-modal-overlay");
 		if (overlay) {
 			overlay.addEventListener("click", (event: MouseEvent) => {
 				if (closeOnOutsideClick && event.target === event.currentTarget) hidePopup();
@@ -153,17 +157,13 @@ class _HTMLGenericModal extends HTMLElement {
 				main.append(String(content));
 			}
 		}
-		document.body.append(this);
+		document.body.append(this.root);
 
-        setTimeout(() => {
-            const genericModal = this.querySelector(".sl-modal-overlay-animated");
-            if (genericModal) genericModal.classList.add("Active");
-        }, 50);
+		setTimeout(() => {
+			const genericModal = this.root.querySelector(".sl-modal-overlay-animated");
+			if (genericModal) genericModal.classList.add("Active");
+		}, 50);
 	}
 }
-if (typeof customElements !== "undefined" && customElements && typeof customElements.define === "function") {
-	if (!customElements.get("sl-generic-modal")) {
-		customElements.define("sl-generic-modal", _HTMLGenericModal);
-	}
-}
+
 export const PopupModal = new _HTMLGenericModal();

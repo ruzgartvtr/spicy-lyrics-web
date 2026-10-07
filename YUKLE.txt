@@ -1,22 +1,16 @@
-İKİ YOL
+Yer imi gerekmez.
 
-A) Bookmarklet (eklenti content-script'e bağımlı değil)
-1. Terminalde:
-   cd /Users/ruzgar/Desktop/GitHub/spicy-lyrics-web
-   python3 -m http.server 8765
-2. Chrome'da aç: http://127.0.0.1:8765/bookmarklet.html
-3. Yeşil "Sözler" bağlantısını yer imleri çubuğuna sürükle
-4. open.spotify.com'da şarkı çal, yer imine tıkla
-5. sl_pk_ anahtarını gir
-6. Spicy Lyrics dashboard allowlist'ine ekle: https://open.spotify.com
+1. chrome://extensions
+2. Eski "Spicy Lyrics Web" kartlarını Kaldır
+3. Geliştirici modu → Paketlenmemiş öğe yükle
+4. Klasör: /Users/ruzgar/Desktop/GitHub/spicy-lyrics-web
+5. open.spotify.com sekmesini aç ve bir şarkı çal
+6. Chrome araç çubuğunda yapboz (eklentiler) simgesine bas
+7. "Spicy Lyrics Web"e tıkla
+8. Açılan küçük pencerede yeşil "Sözler'i aç" düğmesine bas
 
-B) Eklenti
-1. chrome://extensions → eski Spicy Lyrics Web kartlarını KALDIR
-2. Geliştirici modu → Paketlenmemiş öğe yükle
-3. Klasör: /Users/ruzgar/Desktop/GitHub/spicy-lyrics-web
-4. open.spotify.com sekmesini kapatıp yeniden aç
-5. Sağ altta yeşil Sözler
+İlk kullanımda anahtar için:
+  aynı penceredeki "Anahtar ayarları" → sl_pk_ yapıştır
 
-Doğrulama (Spotify login gerekmez):
-  http://127.0.0.1:8765/mock-spotify.html
-  Sayfada "PASS — Sözler düğmesi var" yazmalı.
+Allowlist:
+  chrome-extension://jfhplaabgooiknhchiegghccnboahmfp

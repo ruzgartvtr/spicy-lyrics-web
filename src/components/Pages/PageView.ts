@@ -106,24 +106,31 @@ const PageView = {
   IsTippyCapable: true,
 };
 
-export const GetPageRoot = () =>
+export const GetPageRoot = () => {
+  // Web port: never mount into Spotify's real main view — the overlay covers it.
+  if ((globalThis as any).__SL_WEB__) {
+    return document.querySelector<HTMLElement>("#SpicyLyricsWebRoot .main-view-container");
+  }
+
   /* document.querySelector<HTMLElement>(".QdB2YtfEq0ks5O4QbtwX .WRGTOibB8qNEkgPNtMxq") ?? */
-  document.querySelector<HTMLElement>(
-    ":is(.Root__main-view, :where(#main-view)) .main-view-container div[data-overlayscrollbars-viewport]"
-  ) ??
-  (() => {
-    const child = document.querySelector<HTMLElement>(
-      ":is(.Root__main-view, :where(#main-view)) .main-view-container .main-view-container__scroll-node-child"
-    );
-    return child?.parentElement as HTMLElement | null;
-  })() ??
-  document.querySelector<HTMLElement>(
-    ":is(.Root__main-view, :where(#main-view)) .main-view-container .os-host"
-  ) ??
-  document.querySelector<HTMLElement>(
-    ":is(.Root__main-view, :where(#main-view)) .main-view-container .uGZUPBPcDpzSYqKcQT8r > div"
-  ) ??
-  document.querySelector<HTMLElement>("#SpicyLyricsWebRoot .main-view-container");
+  return (
+    document.querySelector<HTMLElement>(
+      ":is(.Root__main-view, :where(#main-view)) .main-view-container div[data-overlayscrollbars-viewport]"
+    ) ??
+    (() => {
+      const child = document.querySelector<HTMLElement>(
+        ":is(.Root__main-view, :where(#main-view)) .main-view-container .main-view-container__scroll-node-child"
+      );
+      return child?.parentElement as HTMLElement | null;
+    })() ??
+    document.querySelector<HTMLElement>(
+      ":is(.Root__main-view, :where(#main-view)) .main-view-container .os-host"
+    ) ??
+    document.querySelector<HTMLElement>(
+      ":is(.Root__main-view, :where(#main-view)) .main-view-container .uGZUPBPcDpzSYqKcQT8r > div"
+    )
+  );
+};
 
 let PageMountObserver: MutationObserver | null = null;
 

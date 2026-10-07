@@ -82,7 +82,8 @@ async function main() {
 
   guardSpicetifyScrollingFix();
 
-  if (needsMigration()) {
+  // Web port: never block boot on the desktop settings-migration modal.
+  if (!(globalThis as any).__SL_WEB__ && needsMigration()) {
     showMigrationModal();
     return;
   }
@@ -1075,6 +1076,23 @@ async function main() {
       });
       Spicetify.Platform.History.listen(Session.RecordNavigation);
       Session.RecordNavigation(Spicetify.Platform.History.location);
+
+      if ((globalThis as any).__SL_WEB__) {
+        const openIntoWebRoot = () => {
+          const container = document.querySelector<HTMLElement>(
+            "#SpicyLyricsWebRoot .main-view-container",
+          );
+          Spicetify.Platform.History.push({ pathname: "/SpicyLyrics" });
+          if (container) {
+            void PageView.Open(container);
+          } else {
+            void PageView.Open();
+          }
+        };
+        (window as any).__SL_open = openIntoWebRoot;
+        (window as any).__SL_READY__ = true;
+        window.dispatchEvent(new CustomEvent("slweb:ready"));
+      }
 
       Global.Event.listen("session:navigation", (data: Location) => {
         if (data.pathname === "/SpicyLyrics/Update") {

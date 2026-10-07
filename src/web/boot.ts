@@ -4,8 +4,28 @@ import "./overlay.css";
 declare global {
   interface Window {
     __SL_WEB_BOOTED__?: boolean;
+    __SL_READY__?: boolean;
     __SL_open?: () => void;
   }
+}
+
+function waitForReady(timeoutMs = 15000): Promise<void> {
+  if (window.__SL_READY__) return Promise.resolve();
+  return new Promise((resolve, reject) => {
+    const onReady = () => {
+      cleanup();
+      resolve();
+    };
+    const timer = window.setTimeout(() => {
+      cleanup();
+      reject(new Error("Spicy Lyrics hazır olmadı (zaman aşımı)"));
+    }, timeoutMs);
+    const cleanup = () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("slweb:ready", onReady);
+    };
+    window.addEventListener("slweb:ready", onReady);
+  });
 }
 
 async function boot() {
@@ -30,7 +50,10 @@ async function boot() {
       );
     }
 
+    // app.tsx calls main() without awaiting — wait until History listeners exist
+    // before opening, otherwise only the black overlay shows.
     await import("../app.tsx");
+    await waitForReady();
     window.__SL_WEB_BOOTED__ = true;
     window.__SL_open?.();
   } catch (error) {

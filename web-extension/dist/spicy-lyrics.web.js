@@ -46374,9 +46374,11 @@ PLAYBACK BAR
         IsOpened: false,
         IsTippyCapable: true
       };
-      GetPageRoot = () => (
-        /* document.querySelector<HTMLElement>(".QdB2YtfEq0ks5O4QbtwX .WRGTOibB8qNEkgPNtMxq") ?? */
-        document.querySelector(
+      GetPageRoot = () => {
+        if (globalThis.__SL_WEB__) {
+          return document.querySelector("#SpicyLyricsWebRoot .main-view-container");
+        }
+        return document.querySelector(
           ":is(.Root__main-view, :where(#main-view)) .main-view-container div[data-overlayscrollbars-viewport]"
         ) ?? (() => {
           const child = document.querySelector(
@@ -46387,8 +46389,8 @@ PLAYBACK BAR
           ":is(.Root__main-view, :where(#main-view)) .main-view-container .os-host"
         ) ?? document.querySelector(
           ":is(.Root__main-view, :where(#main-view)) .main-view-container .uGZUPBPcDpzSYqKcQT8r > div"
-        ) ?? document.querySelector("#SpicyLyricsWebRoot .main-view-container")
-      );
+        );
+      };
       PageMountObserver = null;
       PageResizeListener = null;
       PageContainer = null;
@@ -50868,7 +50870,7 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
     }
     await Platform_default.OnSpotifyReady;
     guardSpicetifyScrollingFix();
-    if (needsMigration()) {
+    if (!globalThis.__SL_WEB__ && needsMigration()) {
       showMigrationModal();
       return;
     }
@@ -51576,6 +51578,22 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
         });
         Spicetify.Platform.History.listen(Session_default.RecordNavigation);
         Session_default.RecordNavigation(Spicetify.Platform.History.location);
+        if (globalThis.__SL_WEB__) {
+          const openIntoWebRoot = () => {
+            const container = document.querySelector(
+              "#SpicyLyricsWebRoot .main-view-container"
+            );
+            Spicetify.Platform.History.push({ pathname: "/SpicyLyrics" });
+            if (container) {
+              void PageView_default.Open(container);
+            } else {
+              void PageView_default.Open();
+            }
+          };
+          window.__SL_open = openIntoWebRoot;
+          window.__SL_READY__ = true;
+          window.dispatchEvent(new CustomEvent("slweb:ready"));
+        }
         Global_default.Event.listen("session:navigation", (data) => {
           if (data.pathname === "/SpicyLyrics/Update") {
             $fromVersion.set($spicyLyricsVersion.get());
@@ -51990,10 +52008,28 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
 
   // src/web/overlay.css
   var style = document.createElement("style");
-  style.textContent = '#SpicyLyricsWebRoot {\n  position: fixed;\n  z-index: 9999;\n  inset: 0 0 88px 0;\n  display: none;\n  background: #000;\n}\n\n#SpicyLyricsWebRoot.is-open {\n  display: block;\n}\n\n#SpicyLyricsWebRoot .main-view-container {\n  width: 100%;\n  height: 100%;\n  position: relative;\n  overflow: hidden;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage {\n  width: 100%;\n  height: 100%;\n}\n\n#slw-open-button {\n  position: fixed;\n  right: 24px;\n  bottom: 96px;\n  z-index: 2147483646;\n  margin: 0;\n  border: 0;\n  border-radius: 999px;\n  padding: 12px 16px;\n  background: #1ed760;\n  color: #000;\n  font: 700 14px/1 "Helvetica Neue", sans-serif;\n  cursor: pointer;\n}\n\n#slw-open-button[aria-pressed="true"] {\n  background: #1ed760;\n}\n\n';
+  style.textContent = '#SpicyLyricsWebRoot {\n  position: fixed;\n  z-index: 9999;\n  inset: 0 0 88px 0;\n  display: none;\n  background: #000;\n  overflow: hidden;\n  color: #fff;\n}\n\n#SpicyLyricsWebRoot.is-open {\n  display: block;\n}\n\n#SpicyLyricsWebRoot.Root__main-view,\n#SpicyLyricsWebRoot .main-view-container,\n#SpicyLyricsWebRoot .main-view-container__scroll-node-child {\n  width: 100% !important;\n  height: 100% !important;\n  position: relative !important;\n  overflow: hidden !important;\n  margin: 0 !important;\n  padding: 0 !important;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage {\n  position: absolute !important;\n  inset: 0 !important;\n  width: 100% !important;\n  height: 100% !important;\n  opacity: 1 !important;\n  visibility: visible !important;\n  z-index: 1;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage .ContentBox {\n  opacity: 1 !important;\n  visibility: visible !important;\n}\n\n#slw-open-button {\n  position: fixed;\n  right: 24px;\n  bottom: 96px;\n  z-index: 2147483646;\n  margin: 0;\n  border: 0;\n  border-radius: 999px;\n  padding: 12px 16px;\n  background: #1ed760;\n  color: #000;\n  font: 700 14px/1 "Helvetica Neue", sans-serif;\n  cursor: pointer;\n}\n\n#slw-open-button[aria-pressed="true"] {\n  background: #1ed760;\n}\n';
   document.documentElement.append(style);
 
   // src/web/boot.ts
+  function waitForReady(timeoutMs = 15e3) {
+    if (window.__SL_READY__) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const onReady = () => {
+        cleanup();
+        resolve();
+      };
+      const timer = window.setTimeout(() => {
+        cleanup();
+        reject(new Error("Spicy Lyrics haz\u0131r olmad\u0131 (zaman a\u015F\u0131m\u0131)"));
+      }, timeoutMs);
+      const cleanup = () => {
+        window.clearTimeout(timer);
+        window.removeEventListener("slweb:ready", onReady);
+      };
+      window.addEventListener("slweb:ready", onReady);
+    });
+  }
   async function boot() {
     if (window.__SL_WEB_BOOTED__) {
       window.__SL_open?.();
@@ -52014,6 +52050,7 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
         );
       }
       await Promise.resolve().then(() => (init_app2(), app_exports));
+      await waitForReady();
       window.__SL_WEB_BOOTED__ = true;
       window.__SL_open?.();
     } catch (error) {

@@ -1,3 +1,7 @@
+const lyricsCache = new Map();
+const lyricsInflight = new Map();
+const CACHE_TTL_MS = 30 * 60 * 1000;
+
 async function seedLocalDefaults() {
   try {
     const response = await fetch(chrome.runtime.getURL("local-defaults.json"));
@@ -24,6 +28,17 @@ chrome.runtime.onInstalled.addListener(() => {
   void seedLocalDefaults();
 });
 void seedLocalDefaults();
+
+async function fetchLyricsNetwork(trackId, key) {
+  const response = await fetch(`https://api.spicylyrics.org/v1/lyrics/${encodeURIComponent(trackId)}`, {
+    headers: {
+      Authorization: `Bearer ${key}`,
+      Accept: "application/json",
+    },
+  });
+  const body = await response.text();
+  return { ok: response.ok, status: response.status, body };
+}
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "slw-force-open" || message?.type === "slw-open") {
@@ -60,63 +75,44 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ ok: false, status: 400, error: "bad-track", body: "" });
       return true;
     }
-    readPublishableKey()
+
+    const cached = lyricsCache.get(trackId);
+    if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
+      sendResponse({ ...cached.value, cached: true });
+      return true;
+    }
+
+    const existing = lyricsInflight.get(trackId);
+    if (existing) {
+      existing.then(sendResponse).catch(() => sendResponse({ ok: false, status: 0, error: "network", body: "" }));
+      return true;
+    }
+
+    const pending = readPublishableKey()
       .then(async (key) => {
         if (!key || key.startsWith("sl_sk_")) {
-          sendResponse({ ok: false, status: 401, error: "web-key", body: "" });
-          return;
+          return { ok: false, status: 401, error: "web-key", body: "" };
         }
         try {
-          const response = await fetch(`https://api.spicylyrics.org/v1/lyrics/${encodeURIComponent(trackId)}`, {
-            headers: {
-              Authorization: `Bearer ${key}`,
-              Accept: "application/json",
-            },
-          });
-          const body = await response.text();
-          sendResponse({
-            ok: response.ok,
-            status: response.status,
-            body,
-          });
+          const value = await fetchLyricsNetwork(trackId, key);
+          if (value.ok || value.status === 404) {
+            lyricsCache.set(trackId, { at: Date.now(), value });
+          }
+          return value;
         } catch {
-          sendResponse({ ok: false, status: 0, error: "network", body: "" });
+          return { ok: false, status: 0, error: "network", body: "" };
         }
       })
-      .catch(() => sendResponse({ ok: false, status: 0, error: "network", body: "" }));
+      .finally(() => {
+        lyricsInflight.delete(trackId);
+      });
+
+    lyricsInflight.set(trackId, pending);
+    pending.then(sendResponse);
     return true;
   }
 
-  if (message?.type !== "spicy-lyrics-proxy") return undefined;
-  if (typeof message.url !== "string" || !message.url.startsWith("https://api.spicylyrics.org/")) {
-    sendResponse({ status: 400, body: "" });
-    return undefined;
-  }
-  if (message.url.includes("/query") || !message.url.includes("/v1/lyrics/")) {
-    sendResponse({ status: 418, body: "{\"error\":\"web-port-skips-query\"}" });
-    return undefined;
-  }
-
-  fetch(message.url, {
-    method: message.method || "GET",
-    headers: message.headers || {},
-    body: message.body,
-  })
-    .then(async (response) => {
-      try {
-        sendResponse({ status: response.status, body: await response.text() });
-      } catch {
-        // Tab closed.
-      }
-    })
-    .catch(() => {
-      try {
-        sendResponse({ status: 0, body: "" });
-      } catch {
-        // Tab closed.
-      }
-    });
-  return true;
+  return undefined;
 });
 
 chrome.tabs.onUpdated.addListener((tabId, info, tab) => {

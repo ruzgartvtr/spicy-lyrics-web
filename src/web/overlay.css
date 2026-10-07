@@ -37,6 +37,40 @@
 #SpicyLyricsWebRoot #SpicyLyricsPage .ContentBox {
   opacity: 1 !important;
   visibility: visible !important;
+  display: flex !important;
+  flex-direction: row !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Center lyrics column must take remaining space (NowBar is the side). */
+#SpicyLyricsWebRoot #SpicyLyricsPage .LyricsContainer {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  width: auto !important;
+  height: 100% !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: flex !important;
+  position: relative !important;
+}
+
+#SpicyLyricsWebRoot #SpicyLyricsPage .LyricsContainer.Hidden {
+  display: flex !important;
+  opacity: 1 !important;
+}
+
+#SpicyLyricsWebRoot #SpicyLyricsPage .LyricsContainer .LyricsContent,
+#SpicyLyricsWebRoot #SpicyLyricsPage .lyricsParent,
+#SpicyLyricsWebRoot #SpicyLyricsPage .lyrics {
+  opacity: 1 !important;
+  visibility: visible !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+#SpicyLyricsWebRoot #SpicyLyricsPage .NowBar {
+  flex: 0 0 auto !important;
 }
 
 #slw-status {

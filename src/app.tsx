@@ -24,6 +24,7 @@ import {
   $spicyLyricsVersion,
   $staticBackgroundMode,
   $developerMode,
+  $disableNpvLyrics,
 } from "./utils/stores.ts";
 import Global from "./components/Global/Global.ts";
 import Platform from "./components/Global/Platform.ts";
@@ -115,6 +116,12 @@ async function main() {
   window._spicy_lyrics_metadata = {};
 
   void initSession();
+
+  // Web: only the main Spicy Lyrics page (not the right-rail NPV card) — stops
+  // search-page prefetch storms and keeps one high-quality render target.
+  if ((globalThis as any).__SL_WEB__) {
+    $disableNpvLyrics.set(true);
+  }
 
   // Remote Spikerko fonts are CORS-blocked on open.spotify.com; keep system stack on web.
   if (!(globalThis as any).__SL_WEB__) {
@@ -764,7 +771,15 @@ async function main() {
 
       const songUri = event?.data?.item?.uri;
       if (songUri) {
-        fetchLyrics(songUri).then(ApplyLyrics);
+        // Web: do not hit the API while browsing/searching with the page closed.
+        if (
+          !(globalThis as any).__SL_WEB__ ||
+          PageView.IsOpened ||
+          Fullscreen.IsOpen ||
+          Fullscreen.CinemaViewOpen
+        ) {
+          fetchLyrics(songUri).then(ApplyLyrics);
+        }
       }
 
       const _staticBgMode = $staticBackgroundMode.get();
@@ -1120,17 +1135,6 @@ async function main() {
         } catch {
           // ignore
         }
-        // First successful boot: open once so the user sees the page without fighting toggles.
-        if (!(window as any).__SL_AUTOOPENED__) {
-          (window as any).__SL_AUTOOPENED__ = true;
-          window.setTimeout(() => {
-            try {
-              openIntoWebRoot();
-            } catch (error) {
-              console.warn("Spicy Lyrics auto-open failed", error);
-            }
-          }, 300);
-        }
       }
 
       Global.Event.listen("session:navigation", (data: Location) => {
@@ -1165,7 +1169,9 @@ async function main() {
     () => syncLyricsButtonRegistration()
   );
 
-  initNPVLyrics();
+  if (!(globalThis as any).__SL_WEB__) {
+    initNPVLyrics();
+  }
 
   Hometinue();
 

@@ -8,54 +8,28 @@ function parseClock(text: string | null | undefined): number | null {
   return (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
 }
 
-function findTrackAnchor(doc: Document): HTMLAnchorElement | null {
-  const scopes = [
-    doc.querySelector("[data-testid='now-playing-widget']"),
-    doc.querySelector("[data-testid='now-playing-bar']"),
-    doc.querySelector("footer"),
-    doc.querySelector("[data-testid='player-controls']")?.closest("footer, aside, div"),
-    doc.body,
-  ].filter(Boolean) as Element[];
-
-  for (const scope of scopes) {
-    const direct = scope.querySelector<HTMLAnchorElement>("a[href*='/track/']");
-    if (direct?.getAttribute("href")?.includes("/track/")) return direct;
-  }
-  return doc.querySelector<HTMLAnchorElement>("a[href*='/track/']");
-}
-
+/** Only the now-playing chip — never search results / playlist rows. */
 function readTrack(doc: Document) {
-  const widget =
-    doc.querySelector("[data-testid='now-playing-widget']") ||
-    doc.querySelector("[data-testid='now-playing-bar']") ||
-    findTrackAnchor(doc)?.closest("[data-testid], footer, aside") ||
-    null;
+  const widget = doc.querySelector("[data-testid='now-playing-widget']");
+  if (!widget) return null;
 
-  const trackLink = (widget?.querySelector("a[href*='/track/']") as HTMLAnchorElement | null) || findTrackAnchor(doc);
+  const trackLink = widget.querySelector<HTMLAnchorElement>("a[href*='/track/']");
   const href = trackLink?.getAttribute("href") || "";
   const trackId = href.match(/\/track\/([A-Za-z0-9]+)/)?.[1] || "";
   if (!trackId) {
-    const episode =
-      widget?.querySelector("a[href*='/episode/']") || doc.querySelector("a[href*='/episode/']");
-    if (episode) return { type: "episode" as const };
+    if (widget.querySelector("a[href*='/episode/']")) return { type: "episode" as const };
     return null;
   }
+
   const title = (
-    widget?.querySelector("[data-testid='context-item-link'], [data-testid='context-item-info-title']")
+    widget.querySelector("[data-testid='context-item-link'], [data-testid='context-item-info-title']")
     || trackLink
-  )?.textContent?.trim() || trackLink?.getAttribute("aria-label")?.trim() || "";
-  const artist = (
-    widget?.querySelector(
-      "[data-testid='context-item-info-artist'] a, [data-testid='context-item-info-artist'], a[href*='/artist/']",
-    ) || doc.querySelector("[data-testid='context-item-info-artist'] a, a[href*='/artist/']")
   )?.textContent?.trim() || "";
-  const artUrl =
-    widget?.querySelector("img")?.getAttribute("src") ||
-    doc.querySelector("[data-testid='now-playing-widget'] img, [data-testid='cover-art-button'] img")?.getAttribute("src") ||
-    "";
-  const bar =
-    doc.querySelector("[data-testid='playback-progressbar']") ||
-    doc.querySelector("[data-testid='progress-bar']");
+  const artist = widget.querySelector(
+    "[data-testid='context-item-info-artist'] a, [data-testid='context-item-info-artist'], a[href*='/artist/']",
+  )?.textContent?.trim() || "";
+  const artUrl = widget.querySelector("img")?.getAttribute("src") || "";
+  const bar = doc.querySelector("[data-testid='playback-progressbar']");
   const nowAttr = Number(bar?.getAttribute("aria-valuenow"));
   const maxAttr = Number(bar?.getAttribute("aria-valuemax"));
   const positionFromText = parseClock(doc.querySelector("[data-testid='playback-position']")?.textContent);
@@ -65,17 +39,19 @@ function readTrack(doc: Document) {
   if (Number.isFinite(maxAttr) && maxAttr > 1000 && Number.isFinite(nowAttr)) {
     durationMs = maxAttr;
     positionMs = nowAttr;
-  } else if (Number.isFinite(maxAttr) && maxAttr > 0 && maxAttr <= 100 && Number.isFinite(nowAttr) && durationMs > 0) {
+  } else if (
+    Number.isFinite(maxAttr) &&
+    maxAttr > 0 &&
+    maxAttr <= 100 &&
+    Number.isFinite(nowAttr) &&
+    durationMs > 0
+  ) {
     positionMs = (nowAttr / maxAttr) * durationMs;
   }
   const label = (
     doc.querySelector("[data-testid='control-button-playpause']")?.getAttribute("aria-label") || ""
   ).toLowerCase();
-  const playing =
-    label.includes("pause") ||
-    label.includes("duraklat") ||
-    label.includes("pausar") ||
-    label.includes("anhalten");
+  const playing = label.includes("pause") || label.includes("duraklat");
   return { type: "track" as const, trackId, title, artist, artUrl, positionMs, durationMs, playing };
 }
 
@@ -100,56 +76,23 @@ function seekToRatio(doc: Document, ratio: number) {
   bar.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, clientX, clientY }));
 }
 
-function installFetchProxy() {
-  const chromeApi = (globalThis as any).chrome;
-  if (!chromeApi?.runtime?.sendMessage) return;
+/** Never proxy through messaging — lyrics use dedicated fetch-lyrics. Stops port spam. */
+function installFetchGuard() {
   const nativeFetch = globalThis.fetch.bind(globalThis);
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     if (!url.startsWith("https://api.spicylyrics.org/")) return nativeFetch(input, init);
-    // Only the public lyrics endpoint is proxied. Everything else (esp. /query)
-    // would 418 and spam "message port closed" when the service worker sleeps.
-    if (!url.includes("/v1/lyrics/")) {
-      if (url.includes("/query")) {
-        return new Response(JSON.stringify({ error: "web-port-skips-query" }), { status: 418 });
-      }
-      return new Response("", { status: 204 });
+    if (url.includes("/query")) {
+      return new Response(JSON.stringify({ error: "web-port-skips-query" }), { status: 418 });
     }
-    const headers: Record<string, string> = {};
-    new Headers(init?.headers).forEach((value, key) => {
-      headers[key] = value;
-    });
-    try {
-      const proxied = await new Promise<{ body?: string; status?: number } | undefined>((resolve) => {
-        let settled = false;
-        const finish = (value?: { body?: string; status?: number }) => {
-          if (settled) return;
-          settled = true;
-          resolve(value);
-        };
-        try {
-          chromeApi.runtime.sendMessage(
-            {
-              type: "spicy-lyrics-proxy",
-              url,
-              method: init?.method || "GET",
-              headers,
-              body: typeof init?.body === "string" ? init.body : undefined,
-            },
-            (response: { body?: string; status?: number } | undefined) => {
-              void chromeApi.runtime.lastError;
-              finish(response);
-            },
-          );
-        } catch {
-          finish(undefined);
-        }
-        setTimeout(() => finish(undefined), 15000);
+    // Public lyrics must go through chrome.runtime fetch-lyrics (cached).
+    if (url.includes("/v1/lyrics/")) {
+      return new Response(JSON.stringify({ error: "use-fetch-lyrics-message" }), {
+        status: 599,
+        headers: { "content-type": "application/json" },
       });
-      return new Response(proxied?.body ?? "", { status: proxied?.status || 0 });
-    } catch {
-      return new Response("", { status: 0 });
     }
+    return new Response("", { status: 204 });
   }) as typeof fetch;
 }
 
@@ -177,7 +120,7 @@ function publishWebDebug(extra: Record<string, unknown> = {}) {
 export function installWebSpicetify() {
   if ((globalThis as any).__SL_WEB__) return;
   (globalThis as any).__SL_WEB__ = true;
-  installFetchProxy();
+  installFetchGuard();
   publishWebDebug({ stage: "install-start" });
 
   let root: HTMLDivElement | null = null;
@@ -191,7 +134,6 @@ export function installWebSpicetify() {
       el.className = "Root__main-view";
       el.innerHTML = `<div class="main-view-container"><div class="main-view-container__scroll-node-child"></div></div>`;
     }
-    // Spotify's SPA frequently replaces body/html children — keep our host attached.
     if (!el.isConnected || el.ownerDocument !== document) {
       document.documentElement.append(el);
     } else if (el.parentElement !== document.documentElement && el.parentElement !== document.body) {
@@ -213,7 +155,7 @@ export function installWebSpicetify() {
   }).observe(document.documentElement, { childList: true, subtree: true });
   setInterval(() => {
     if (!document.getElementById("SpicyLyricsWebRoot")?.isConnected) ensureRoot();
-  }, 1000);
+  }, 2000);
 
   const listeners = new Map<string, Set<PlayerListener>>();
   const historyListeners = new Set<(location: { pathname: string }) => void>();
@@ -248,101 +190,78 @@ export function installWebSpicetify() {
     for (const listener of listeners.get(type) || []) listener({ data });
   };
 
-  const Spicetify = {
-    LocalStorage: {
-      get: (key: string) => localStorage.getItem(key),
-      set: (key: string, value: string) => localStorage.setItem(key, value),
-    },
-    Config: { version: "2.46.0", current_theme: "" },
-    Tippy: undefined,
-    TippyProps: {},
-    SVGIcons: {},
-    Keyboard: {
-      KEYS: { ESCAPE: "Escape", F11: "F11" },
-      registerImportantShortcut(key: string, callback: () => void) {
-        document.addEventListener("keydown", (event) => {
-          if (event.key === key) callback();
-        });
+  const Spicetify: any = {
+    Platform: {
+      History: history,
+      version: "1.2.0",
+      CosmosAsync: {
+        get: async () => ({}),
+        post: async () => ({}),
+        put: async () => ({}),
+        del: async () => ({}),
       },
-    },
-    Menu: {
-      Item: class {
-        onClick: () => void;
-        constructor(_name: string, _enabled: boolean, onClick: () => void) {
-          this.onClick = onClick;
-        }
-        register() {}
+      AuthorizationAPI: {
+        getState: async () => ({ isAuthorized: true, token: null }),
       },
     },
     CosmosAsync: {
-      get: async () => null,
-      post: async () => null,
-      put: async () => null,
-      del: async () => null,
-    },
-    GraphQL: {
-      Request: async () => null,
-      Definitions: new Proxy({}, { get: () => ({}) }),
-    },
-    colorExtractor: async () => ({}),
-    Platform: {
-      version: "1.2.70.0",
-      PlatformData: { app_platform: "web" },
-      History: history,
-      AuthorizationAPI: {
-        getState: () => ({ isAuthorized: true, token: { accessToken: "web", accessTokenExpirationTimestampMs: Date.now() + 3_600_000 } }),
-      },
-      LibraryAPI: {
-        add: async () => {},
-        remove: async () => {},
-      },
-      PlaybackAPI: {
-        _isLocal: true,
-        _events: { addListener() {} },
-      },
-      PlayerAPI: {
-        _state: playerState,
-        _contextPlayer: {
-          getPositionState: async () => ({ position: playerState.positionAsOfTimestamp }),
-          resume: async () => {},
-        },
-      },
-      Session: {},
+      get: async () => ({}),
+      post: async () => ({}),
+      put: async () => ({}),
+      del: async () => ({}),
     },
     Player: {
       data: playerData,
-      origin: {
-        _state: playerState,
-        seekTo(position: number) {
-          if (durationMs > 0) seekToRatio(document, position / durationMs);
-        },
+      get progress() {
+        return playerState.positionAsOfTimestamp + (playerState.isPaused ? 0 : Date.now() - playerState.timestamp);
+      },
+      get duration() {
+        return durationMs;
+      },
+      get track() {
+        return playerData.item;
       },
       isPlaying: () => !playerState.isPaused,
-      getProgress: () => playerState.positionAsOfTimestamp,
-      getRepeat: () => 0,
-      getHeart: () => false,
-      getVolume: () => 1,
-      pause: () => clickControl(document, "[data-testid='control-button-playpause']"),
       play: () => clickControl(document, "[data-testid='control-button-playpause']"),
+      pause: () => clickControl(document, "[data-testid='control-button-playpause']"),
       togglePlay: () => clickControl(document, "[data-testid='control-button-playpause']"),
       next: () => clickControl(document, "[data-testid='control-button-skip-forward']"),
       back: () => clickControl(document, "[data-testid='control-button-skip-back']"),
-      setShuffle() {},
-      setRepeat() {},
-      setVolume() {},
-      setMute() {},
-      addEventListener(type: string, listener: PlayerListener) {
-        const bucket = listeners.get(type) || new Set<PlayerListener>();
-        bucket.add(listener);
-        listeners.set(type, bucket);
+      seek: (ms: number) => {
+        if (durationMs > 0) seekToRatio(document, ms / durationMs);
       },
-      removeEventListener(type: string, listener: PlayerListener) {
-        listeners.get(type)?.delete(listener);
+      getHeart: () => false,
+      addEventListener: (type: string, cb: PlayerListener) => {
+        if (!listeners.has(type)) listeners.set(type, new Set());
+        listeners.get(type)!.add(cb);
       },
-      dispatchEvent(type: string, data?: any) {
-        emit(type, data);
+      removeEventListener: (type: string, cb: PlayerListener) => {
+        listeners.get(type)?.delete(cb);
       },
     },
+    LocalStorage: {
+      get: (key: string) => {
+        try {
+          return localStorage.getItem(`slw:${key}`);
+        } catch {
+          return null;
+        }
+      },
+      set: (key: string, value: string) => {
+        try {
+          localStorage.setItem(`slw:${key}`, value);
+        } catch {
+          // ignore
+        }
+      },
+    },
+    Keyboard: {
+      KEYS: { ESCAPE: "Escape", F11: "F11" },
+      registerImportantShortcut: () => {},
+    },
+    Tippy: undefined,
+    TippyProps: {},
+    colorExtractor: async () => ({ VIBRANT_NON_ALARMING: "#999999" }),
   };
 
   (globalThis as any).Spicetify = Spicetify;
@@ -353,7 +272,7 @@ export function installWebSpicetify() {
     const snap = readTrack(document);
     if (!snap || snap.type !== "track") {
       if (playerData.item?.type === "track") {
-        playerData.item = snap?.type === "episode" ? { type: "episode", uri: "", mediaType: "audio" } : null;
+        playerData.item = null;
         lastUri = "";
       }
       return;
@@ -375,6 +294,7 @@ export function installWebSpicetify() {
       provider: "",
     };
     playerData.item = item;
+    // Only emit songchange when the now-playing track actually changes.
     if (uri !== lastUri) {
       lastUri = uri;
       emit("songchange", { item });
@@ -385,7 +305,7 @@ export function installWebSpicetify() {
     }
   };
   poll();
-  setInterval(poll, 200);
+  setInterval(poll, 500);
 
   let openImpl = () => {
     ensureRoot();
@@ -394,10 +314,12 @@ export function installWebSpicetify() {
   const closeLyrics = () => {
     ensureRoot();
     history.goBack();
+    const status = document.getElementById("slw-status");
+    if (status) status.hidden = true;
   };
   const openLyrics = () => {
     openImpl();
-    publishWebDebug({ stage: "open", pathname: history.location.pathname, connected: !!root?.isConnected });
+    publishWebDebug({ stage: "open", pathname: history.location.pathname, trackId: lastUri });
   };
   const toggleLyrics = () => {
     const now = Date.now();
@@ -408,11 +330,6 @@ export function installWebSpicetify() {
     } else {
       openLyrics();
     }
-    publishWebDebug({
-      stage: "toggle",
-      pathname: history.location.pathname,
-      connected: !!root?.isConnected,
-    });
   };
   const syncOpenButton = () => {
     const open = history.location.pathname === "/SpicyLyrics";
@@ -435,12 +352,10 @@ export function installWebSpicetify() {
   (window as any).__SL_open = openLyrics;
   (window as any).__SL_close = closeLyrics;
   (window as any).__SL_toggle = toggleLyrics;
-  // Events: open = force open (not toggle). Toggle only from the button handler.
   window.addEventListener("slw-open", openLyrics);
   window.addEventListener("slw-force-open", openLyrics);
   window.addEventListener("slw-toggle", toggleLyrics);
 
-  // Single click owner — stopImmediatePropagation so button.js cannot double-fire.
   document.addEventListener(
     "click",
     (event) => {
@@ -455,17 +370,19 @@ export function installWebSpicetify() {
   );
 
   const chromeApi = (globalThis as any).chrome;
-  chromeApi?.runtime?.onMessage?.addListener((message: { type?: string }, _sender: unknown, sendResponse: (v: unknown) => void) => {
-    if (message?.type === "slw-force-open" || message?.type === "slw-open") {
-      openLyrics();
-      sendResponse?.({ ok: true });
-      return true;
-    }
-    if (message?.type === "toggle") {
-      toggleLyrics();
-      sendResponse?.({ ok: true });
-      return true;
-    }
-    return undefined;
-  });
+  chromeApi?.runtime?.onMessage?.addListener(
+    (message: { type?: string }, _sender: unknown, sendResponse: (v: unknown) => void) => {
+      if (message?.type === "slw-force-open" || message?.type === "slw-open") {
+        openLyrics();
+        sendResponse?.({ ok: true });
+        return true;
+      }
+      if (message?.type === "toggle") {
+        toggleLyrics();
+        sendResponse?.({ ok: true });
+        return true;
+      }
+      return undefined;
+    },
+  );
 }

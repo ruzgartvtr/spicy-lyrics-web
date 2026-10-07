@@ -266,4 +266,43 @@ export function installWebSpicetify() {
   };
   poll();
   setInterval(poll, 200);
+
+  const openButton = document.createElement("button");
+  openButton.id = "slw-open-button";
+  openButton.type = "button";
+  openButton.textContent = "Sözler";
+  openButton.setAttribute("aria-pressed", "false");
+  const toggleLyrics = () => {
+    if (history.location.pathname === "/SpicyLyrics") history.goBack();
+    else history.push({ pathname: "/SpicyLyrics" });
+  };
+  openButton.addEventListener("click", (event) => {
+    event.stopPropagation();
+    toggleLyrics();
+  });
+  const syncOpenButton = () => {
+    const open = history.location.pathname === "/SpicyLyrics";
+    openButton.setAttribute("aria-pressed", open ? "true" : "false");
+  };
+  const originalPush = history.push.bind(history);
+  history.push = (next: { pathname: string }) => {
+    originalPush(next);
+    syncOpenButton();
+  };
+  const placeOpenButton = () => {
+    const host = document.querySelector("[data-testid='player-controls']")
+      || document.querySelector("[data-testid='now-playing-widget']");
+    if (host && openButton.parentElement !== host) host.append(openButton);
+    else if (!host && !openButton.isConnected) document.documentElement.append(openButton);
+  };
+  placeOpenButton();
+  let placing = false;
+  new MutationObserver(() => {
+    if (placing || (openButton.isConnected && openButton.parentElement?.closest("[data-testid='player-controls'], [data-testid='now-playing-widget']"))) return;
+    placing = true;
+    requestAnimationFrame(() => {
+      placing = false;
+      placeOpenButton();
+    });
+  }).observe(document.documentElement, { childList: true, subtree: true });
 }

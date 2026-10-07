@@ -33,6 +33,21 @@
     (document.documentElement || document.head).appendChild(style);
   }
 
+  function ensureFallbackRoot() {
+    let root = document.getElementById("SpicyLyricsWebRoot");
+    if (!root) {
+      root = document.createElement("div");
+      root.id = "SpicyLyricsWebRoot";
+      root.className = "Root__main-view";
+      root.innerHTML =
+        '<div class="main-view-container"><div class="main-view-container__scroll-node-child" style="color:#fff;padding:24px;font:16px Helvetica,sans-serif">Spicy Lyrics yükleniyor…</div></div>';
+      document.documentElement.appendChild(root);
+    } else if (!root.isConnected) {
+      document.documentElement.appendChild(root);
+    }
+    return root;
+  }
+
   function openSpicyLyrics() {
     try {
       if (typeof window.__SL_toggle === "function") {
@@ -48,14 +63,10 @@
       chrome.runtime.sendMessage({ type: "slw-open" });
     } catch (_) {}
 
-    // Last-resort visual feedback if the main bundle is not ready yet.
-    const root = document.getElementById("SpicyLyricsWebRoot");
-    if (root) {
-      root.classList.toggle("is-open");
-      return;
-    }
+    const root = ensureFallbackRoot();
+    root.classList.toggle("is-open");
     const button = document.getElementById("slw-open-button") || document.getElementById("slw-toggle");
-    if (button) {
+    if (button && typeof window.__SL_toggle !== "function") {
       button.textContent = "Yükleniyor…";
       window.setTimeout(() => {
         if (button.textContent === "Yükleniyor…") button.textContent = "Sözler";

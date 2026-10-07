@@ -71,23 +71,38 @@ function installFetchProxy() {
   globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     if (!url.startsWith("https://api.spicylyrics.org/")) return nativeFetch(input, init);
+    // Desktop session/query always 418 in browsers — never wake the SW for it.
+    if (url.includes("/query")) {
+      return new Response(JSON.stringify({ error: "web-port-skips-query" }), { status: 418 });
+    }
     const headers: Record<string, string> = {};
     new Headers(init?.headers).forEach((value, key) => {
       headers[key] = value;
     });
-    let proxied: { body?: string; status?: number } | undefined;
     try {
-      proxied = await chromeApi.runtime.sendMessage({
-        type: "spicy-lyrics-proxy",
-        url,
-        method: init?.method || "GET",
-        headers,
-        body: typeof init?.body === "string" ? init.body : undefined,
+      const proxied = await new Promise<{ body?: string; status?: number } | undefined>((resolve) => {
+        try {
+          chromeApi.runtime.sendMessage(
+            {
+              type: "spicy-lyrics-proxy",
+              url,
+              method: init?.method || "GET",
+              headers,
+              body: typeof init?.body === "string" ? init.body : undefined,
+            },
+            (response: { body?: string; status?: number } | undefined) => {
+              void chromeApi.runtime.lastError;
+              resolve(response);
+            },
+          );
+        } catch {
+          resolve(undefined);
+        }
       });
+      return new Response(proxied?.body ?? "", { status: proxied?.status || 0 });
     } catch {
       return new Response("", { status: 0 });
     }
-    return new Response(proxied?.body ?? "", { status: proxied?.status || 0 });
   }) as typeof fetch;
 }
 
@@ -319,18 +334,27 @@ export function installWebSpicetify() {
   poll();
   setInterval(poll, 200);
 
-  const openLyrics = () => {
+  let openImpl = () => {
     ensureRoot();
     history.push({ pathname: "/SpicyLyrics" });
   };
-  const toggleLyrics = () => {
-    // Button.js + capture listener + runtime message can all fire on one click.
-    const now = Date.now();
-    if (now - Number((window as any).__SL_TOGGLE_AT || 0) < 400) return;
-    (window as any).__SL_TOGGLE_AT = now;
+  const closeLyrics = () => {
     ensureRoot();
-    if (history.location.pathname === "/SpicyLyrics") history.goBack();
-    else openLyrics();
+    history.goBack();
+  };
+  const openLyrics = () => {
+    openImpl();
+    publishWebDebug({ stage: "open", pathname: history.location.pathname, connected: !!root?.isConnected });
+  };
+  const toggleLyrics = () => {
+    const now = Date.now();
+    if (now - Number((window as any).__SL_TOGGLE_AT || 0) < 500) return;
+    (window as any).__SL_TOGGLE_AT = now;
+    if (history.location.pathname === "/SpicyLyrics" && root?.classList.contains("is-open")) {
+      closeLyrics();
+    } else {
+      openLyrics();
+    }
     publishWebDebug({
       stage: "toggle",
       pathname: history.location.pathname,
@@ -340,7 +364,11 @@ export function installWebSpicetify() {
   const syncOpenButton = () => {
     const open = history.location.pathname === "/SpicyLyrics";
     for (const id of ["slw-open-button", "slw-toggle"]) {
-      document.getElementById(id)?.setAttribute("aria-pressed", open ? "true" : "false");
+      const btn = document.getElementById(id);
+      btn?.setAttribute("aria-pressed", open ? "true" : "false");
+      if (btn && btn.textContent !== "Yükleniyor…") {
+        btn.textContent = open ? "Kapat" : "Sözler";
+      }
     }
   };
   const originalPush = history.push.bind(history);
@@ -348,12 +376,18 @@ export function installWebSpicetify() {
     originalPush(next);
     syncOpenButton();
   };
+  (window as any).__SL_setOpenImpl = (fn: () => void) => {
+    openImpl = fn;
+  };
   (window as any).__SL_open = openLyrics;
+  (window as any).__SL_close = closeLyrics;
   (window as any).__SL_toggle = toggleLyrics;
-  window.addEventListener("slw-open", toggleLyrics);
+  // Events: open = force open (not toggle). Toggle only from the button handler.
+  window.addEventListener("slw-open", openLyrics);
+  window.addEventListener("slw-force-open", openLyrics);
   window.addEventListener("slw-toggle", toggleLyrics);
 
-  // Capture-phase: works even if button.js attached a dead/noop handler.
+  // Single click owner — stopImmediatePropagation so button.js cannot double-fire.
   document.addEventListener(
     "click",
     (event) => {
@@ -361,15 +395,24 @@ export function installWebSpicetify() {
       if (!target?.closest?.("#slw-open-button, #slw-toggle")) return;
       event.preventDefault();
       event.stopPropagation();
+      event.stopImmediatePropagation();
       toggleLyrics();
     },
     true,
   );
 
   const chromeApi = (globalThis as any).chrome;
-  chromeApi?.runtime?.onMessage?.addListener((message: { type?: string }) => {
-    if (message?.type === "slw-open" || message?.type === "toggle") {
-      toggleLyrics();
+  chromeApi?.runtime?.onMessage?.addListener((message: { type?: string }, _sender: unknown, sendResponse: (v: unknown) => void) => {
+    if (message?.type === "slw-force-open" || message?.type === "slw-open") {
+      openLyrics();
+      sendResponse?.({ ok: true });
+      return true;
     }
+    if (message?.type === "toggle") {
+      toggleLyrics();
+      sendResponse?.({ ok: true });
+      return true;
+    }
+    return undefined;
   });
 }

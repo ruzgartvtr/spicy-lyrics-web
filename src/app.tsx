@@ -1101,6 +1101,7 @@ async function main() {
             void PageView.Open();
           }
         };
+        (window as any).__SL_setOpenImpl?.(openIntoWebRoot);
         (window as any).__SL_open = openIntoWebRoot;
         (window as any).__SL_READY__ = true;
         window.dispatchEvent(new CustomEvent("slweb:ready"));

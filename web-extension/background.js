@@ -10,7 +10,7 @@ async function seedLocalDefaults() {
       await chrome.storage.local.set({ publishableKey: key });
     }
   } catch {
-    // local-defaults.json is optional / gitignored
+    // optional
   }
 }
 
@@ -20,27 +20,23 @@ chrome.runtime.onInstalled.addListener(() => {
 void seedLocalDefaults();
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-  if (message?.type === "slw-open" || message?.type === "toggle") {
-    const tabId = sender.tab?.id;
+  if (message?.type === "slw-force-open" || message?.type === "slw-open") {
+    const tabId = sender.tab?.id ?? message.tabId;
     if (tabId != null) {
-      chrome.tabs.sendMessage(tabId, { type: "slw-open" }).catch(() => {});
-      chrome.scripting
-        .executeScript({
-          target: { tabId },
-          world: "ISOLATED",
-          func: () => {
-            try {
-              if (typeof window.__SL_toggle === "function") {
-                window.__SL_toggle();
-                return;
-              }
-            } catch (_) {}
-            window.dispatchEvent(new CustomEvent("slw-open"));
-            const root = document.getElementById("SpicyLyricsWebRoot");
-            if (root) root.classList.toggle("is-open");
-          },
-        })
-        .catch(() => {});
+      chrome.tabs
+        .sendMessage(tabId, { type: "slw-force-open" })
+        .catch(() => {
+          chrome.scripting
+            .executeScript({
+              target: { tabId },
+              world: "ISOLATED",
+              func: () => {
+                if (typeof window.__SL_open === "function") window.__SL_open();
+                else window.dispatchEvent(new CustomEvent("slw-force-open"));
+              },
+            })
+            .catch(() => {});
+        });
     }
     sendResponse({ ok: true });
     return true;
@@ -57,7 +53,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     sendResponse({ status: 400, body: "" });
     return undefined;
   }
-  // Never proxy the desktop /query endpoint from the browser — it always 418s.
   if (message.url.includes("/query")) {
     sendResponse({ status: 418, body: "{\"error\":\"web-port-skips-query\"}" });
     return undefined;
@@ -72,14 +67,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       try {
         sendResponse({ status: response.status, body: await response.text() });
       } catch {
-        // Tab closed before response.
+        // Tab closed.
       }
     })
     .catch(() => {
       try {
         sendResponse({ status: 0, body: "" });
       } catch {
-        // Tab closed before response.
+        // Tab closed.
       }
     });
   return true;

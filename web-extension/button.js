@@ -33,47 +33,6 @@
     (document.documentElement || document.head).appendChild(style);
   }
 
-  function ensureFallbackRoot() {
-    let root = document.getElementById("SpicyLyricsWebRoot");
-    if (!root) {
-      root = document.createElement("div");
-      root.id = "SpicyLyricsWebRoot";
-      root.className = "Root__main-view";
-      root.innerHTML =
-        '<div class="main-view-container"><div class="main-view-container__scroll-node-child" style="color:#fff;padding:24px;font:16px Helvetica,sans-serif">Spicy Lyrics yükleniyor…</div></div>';
-      document.documentElement.appendChild(root);
-    } else if (!root.isConnected) {
-      document.documentElement.appendChild(root);
-    }
-    return root;
-  }
-
-  function openSpicyLyrics() {
-    try {
-      if (typeof window.__SL_toggle === "function") {
-        window.__SL_toggle();
-        return;
-      }
-    } catch (_) {}
-
-    window.dispatchEvent(new CustomEvent("slw-open"));
-    window.dispatchEvent(new CustomEvent("slw-toggle"));
-
-    try {
-      chrome.runtime.sendMessage({ type: "slw-open" });
-    } catch (_) {}
-
-    const root = ensureFallbackRoot();
-    root.classList.toggle("is-open");
-    const button = document.getElementById("slw-open-button") || document.getElementById("slw-toggle");
-    if (button && typeof window.__SL_toggle !== "function") {
-      button.textContent = "Yükleniyor…";
-      window.setTimeout(() => {
-        if (button.textContent === "Yükleniyor…") button.textContent = "Sözler";
-      }, 2500);
-    }
-  }
-
   function ensureButton() {
     let button = document.getElementById("slw-open-button") || document.getElementById("slw-toggle");
     if (!button) {
@@ -83,26 +42,8 @@
       button.textContent = "Sözler";
       button.setAttribute("aria-label", "Spicy Lyrics");
       button.setAttribute("aria-pressed", "false");
-      button.addEventListener(
-        "click",
-        (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          openSpicyLyrics();
-        },
-        true,
-      );
-    } else if (!button.dataset.slwBound) {
-      button.dataset.slwBound = "1";
-      button.addEventListener(
-        "click",
-        (event) => {
-          event.preventDefault();
-          event.stopPropagation();
-          openSpicyLyrics();
-        },
-        true,
-      );
+      // Click is handled by spicy-lyrics.web.js capture listener (single owner).
+      // No runtime message here — that was re-toggling and immediately closing.
     }
     const host = document.body || document.documentElement;
     if (button.parentElement !== host) host.appendChild(button);

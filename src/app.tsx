@@ -116,7 +116,10 @@ async function main() {
 
   void initSession();
 
-  LoadFonts();
+  // Remote Spikerko fonts are CORS-blocked on open.spotify.com; keep system stack on web.
+  if (!(globalThis as any).__SL_WEB__) {
+    LoadFonts();
+  }
   ApplyFontPixel();
 
   const skeletonStyle = document.createElement("style");

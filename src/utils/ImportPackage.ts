@@ -21,6 +21,12 @@ const BuildImportUrl = (
 };
 
 const LoadPackage = async (importUrl: PackageUrl): Promise<Package | Error | undefined> => {
+  // Chrome extension CSP blocks remote import(); romanization is optional on web.
+  if ((globalThis as any).__SL_WEB__) {
+    const empty = {} as Package;
+    packages.set(importUrl, empty);
+    return empty;
+  }
   try {
     if (packages.has(importUrl)) return undefined;
     currentlyLoadingPackages.add(importUrl);

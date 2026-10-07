@@ -10,7 +10,9 @@ import { StripEmptyLyricsLines } from "./EmptyLines.ts";
 
 // Constants
 const RomajiConverter = new Kuroshiro();
-const RomajiPromise = RomajiConverter.init(KuromojiAnalyzer);
+const RomajiPromise = (globalThis as any).__SL_WEB__
+  ? Promise.resolve()
+  : RomajiConverter.init(KuromojiAnalyzer);
 
 const romanizationLogger = new Logger("Lyrics Romanization");
 
@@ -39,15 +41,12 @@ const ItemGreekTest = GreekTextTest;
 const ResidualScriptTest =
   /[぀-ヿ一-鿿가-힯ᄀ-ᇿ㄰-㆏Ѐ-ԯͰ-Ͽἀ-῿]/;
 
-// Load Packages
-RetrievePackage("pinyin", "4.0.0", "mjs")
-  .catch(() => {});
-
-RetrievePackage("aromanize", "1.0.0", "js")
-  .catch(() => {});
-
-RetrievePackage("GreekRomanization", "1.0.0", "js")
-  .catch(() => {});
+// Load Packages (skipped on web — extension CSP blocks pkgs.spikerko.org)
+if (!(globalThis as any).__SL_WEB__) {
+  RetrievePackage("pinyin", "4.0.0", "mjs").catch(() => {});
+  RetrievePackage("aromanize", "1.0.0", "js").catch(() => {});
+  RetrievePackage("GreekRomanization", "1.0.0", "js").catch(() => {});
+}
 
 type RomanizationBranch = "Japanese" | "Chinese" | "Korean" | "Cyrillic" | "Greek";
 

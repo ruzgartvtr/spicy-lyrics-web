@@ -294,16 +294,14 @@ export function installWebSpicetify() {
     originalPush(next);
     syncOpenButton();
   };
+  openButton.style.cssText = "position:fixed;right:24px;bottom:96px;z-index:2147483646;border:0;border-radius:999px;padding:12px 16px;background:#1ed760;color:#000;font:700 14px/1 Helvetica,sans-serif;cursor:pointer;";
   const placeOpenButton = () => {
-    const host = document.querySelector("[data-testid='player-controls']")
-      || document.querySelector("[data-testid='now-playing-widget']");
-    if (host && openButton.parentElement !== host) host.append(openButton);
-    else if (!host && !openButton.isConnected) document.documentElement.append(openButton);
+    if (!openButton.isConnected) document.documentElement.append(openButton);
   };
   placeOpenButton();
   let placing = false;
   new MutationObserver(() => {
-    if (placing || (openButton.isConnected && openButton.parentElement?.closest("[data-testid='player-controls'], [data-testid='now-playing-widget']"))) return;
+    if (placing || openButton.isConnected) return;
     placing = true;
     requestAnimationFrame(() => {
       placing = false;

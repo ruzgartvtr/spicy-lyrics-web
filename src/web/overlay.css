@@ -23,17 +23,18 @@
 }
 
 #slw-open-button {
-  margin-left: 8px;
+  position: fixed;
+  right: 24px;
+  bottom: 96px;
+  z-index: 2147483646;
+  margin: 0;
   border: 0;
   border-radius: 999px;
-  padding: 8px 12px;
-  background: #fff;
+  padding: 12px 16px;
+  background: #1ed760;
   color: #000;
-  font: 700 12px/1 "Helvetica Neue", sans-serif;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font: 700 14px/1 "Helvetica Neue", sans-serif;
   cursor: pointer;
-  z-index: 10000;
 }
 
 #slw-open-button[aria-pressed="true"] {

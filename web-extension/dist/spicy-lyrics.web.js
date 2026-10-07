@@ -51969,15 +51969,14 @@ function installWebSpicetify() {
     originalPush(next);
     syncOpenButton();
   };
+  openButton.style.cssText = "position:fixed;right:24px;bottom:96px;z-index:2147483646;border:0;border-radius:999px;padding:12px 16px;background:#1ed760;color:#000;font:700 14px/1 Helvetica,sans-serif;cursor:pointer;";
   const placeOpenButton = () => {
-    const host = document.querySelector("[data-testid='player-controls']") || document.querySelector("[data-testid='now-playing-widget']");
-    if (host && openButton.parentElement !== host) host.append(openButton);
-    else if (!host && !openButton.isConnected) document.documentElement.append(openButton);
+    if (!openButton.isConnected) document.documentElement.append(openButton);
   };
   placeOpenButton();
   let placing = false;
   new MutationObserver(() => {
-    if (placing || openButton.isConnected && openButton.parentElement?.closest("[data-testid='player-controls'], [data-testid='now-playing-widget']")) return;
+    if (placing || openButton.isConnected) return;
     placing = true;
     requestAnimationFrame(() => {
       placing = false;
@@ -51988,7 +51987,7 @@ function installWebSpicetify() {
 
 // src/web/overlay.css
 var style = document.createElement("style");
-style.textContent = '#SpicyLyricsWebRoot {\n  position: fixed;\n  z-index: 9999;\n  inset: 0 0 88px 0;\n  display: none;\n  background: #000;\n}\n\n#SpicyLyricsWebRoot.is-open {\n  display: block;\n}\n\n#SpicyLyricsWebRoot .main-view-container {\n  width: 100%;\n  height: 100%;\n  position: relative;\n  overflow: hidden;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage {\n  width: 100%;\n  height: 100%;\n}\n\n#slw-open-button {\n  margin-left: 8px;\n  border: 0;\n  border-radius: 999px;\n  padding: 8px 12px;\n  background: #fff;\n  color: #000;\n  font: 700 12px/1 "Helvetica Neue", sans-serif;\n  letter-spacing: 0.04em;\n  text-transform: uppercase;\n  cursor: pointer;\n  z-index: 10000;\n}\n\n#slw-open-button[aria-pressed="true"] {\n  background: #1ed760;\n}\n\nbody > #slw-open-button {\n  position: fixed;\n  right: 24px;\n  bottom: 96px;\n}\n';
+style.textContent = '#SpicyLyricsWebRoot {\n  position: fixed;\n  z-index: 9999;\n  inset: 0 0 88px 0;\n  display: none;\n  background: #000;\n}\n\n#SpicyLyricsWebRoot.is-open {\n  display: block;\n}\n\n#SpicyLyricsWebRoot .main-view-container {\n  width: 100%;\n  height: 100%;\n  position: relative;\n  overflow: hidden;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage {\n  width: 100%;\n  height: 100%;\n}\n\n#slw-open-button {\n  position: fixed;\n  right: 24px;\n  bottom: 96px;\n  z-index: 2147483646;\n  margin: 0;\n  border: 0;\n  border-radius: 999px;\n  padding: 12px 16px;\n  background: #1ed760;\n  color: #000;\n  font: 700 14px/1 "Helvetica Neue", sans-serif;\n  cursor: pointer;\n}\n\n#slw-open-button[aria-pressed="true"] {\n  background: #1ed760;\n}\n\nbody > #slw-open-button {\n  position: fixed;\n  right: 24px;\n  bottom: 96px;\n}\n';
 document.documentElement.append(style);
 
 // src/web/boot.ts

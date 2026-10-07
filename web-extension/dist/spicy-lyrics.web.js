@@ -2098,8 +2098,9 @@ body:has(#SpicyLyricsPage.Fullscreen) aside.NowPlayingView .spicy-dynamic-bg {
       Spotify = globalThis.Spicetify;
       OnSpotifyReady = new Promise((resolve) => {
         const CheckForServices = () => {
-          SpotifyPlatform = Spotify.Platform;
-          SpotifyInternalFetch = Spotify.CosmosAsync;
+          Spotify = globalThis.Spicetify;
+          SpotifyPlatform = Spotify?.Platform;
+          SpotifyInternalFetch = Spotify?.CosmosAsync;
           if (!SpotifyPlatform || !SpotifyInternalFetch) {
             requestAnimationFrame(() => setTimeout(CheckForServices, 0));
             return;
@@ -4152,6 +4153,11 @@ body:has(#SpicyLyricsPage.Fullscreen) aside.NowPlayingView .spicy-dynamic-bg {
         return `${packagesUrl}/${name}/${name}@${version}.${fileType}`;
       };
       LoadPackage = async (importUrl) => {
+        if (globalThis.__SL_WEB__) {
+          const empty = {};
+          packages.set(importUrl, empty);
+          return empty;
+        }
         try {
           if (packages.has(importUrl)) return void 0;
           currentlyLoadingPackages.add(importUrl);
@@ -4190,9 +4196,14 @@ body:has(#SpicyLyricsPage.Fullscreen) aside.NowPlayingView .spicy-dynamic-bg {
   var init_KuromojiAnalyzer = __esm({
     "src/utils/Lyrics/KuromojiAnalyzer.ts"() {
       init_ImportPackage();
-      RetrievePackage("Kuromoji", "1.0.0", "js").catch(() => {
-      });
+      if (!globalThis.__SL_WEB__) {
+        RetrievePackage("Kuromoji", "1.0.0", "js").catch(() => {
+        });
+      }
       init = () => {
+        if (globalThis.__SL_WEB__) {
+          return Promise.resolve();
+        }
         if (Analyzer !== void 0) {
           return Promise.resolve();
         }
@@ -4303,7 +4314,7 @@ body:has(#SpicyLyricsPage.Fullscreen) aside.NowPlayingView .spicy-dynamic-bg {
       init_Logger();
       init_EmptyLines();
       RomajiConverter = new Kuroshiro();
-      RomajiPromise = RomajiConverter.init(KuromojiAnalyzer_exports);
+      RomajiPromise = globalThis.__SL_WEB__ ? Promise.resolve() : RomajiConverter.init(KuromojiAnalyzer_exports);
       romanizationLogger = new Logger_default("Lyrics Romanization");
       KoreanTextTest = /[가-힯]|[ᄀ-ᇿ]|[㄰-㆏]|[ꥠ-꥿]|[ힰ-퟿]/;
       ChineseTextText = /([一-鿿])/;
@@ -4316,12 +4327,14 @@ body:has(#SpicyLyricsPage.Fullscreen) aside.NowPlayingView .spicy-dynamic-bg {
       ItemCyrillicTest = /[Ѐ-ӿԀ-ԯⷠ-ⷿꙀ-ꚟ]/;
       ItemGreekTest = GreekTextTest;
       ResidualScriptTest = /[぀-ヿ一-鿿가-힯ᄀ-ᇿ㄰-㆏Ѐ-ԯͰ-Ͽἀ-῿]/;
-      RetrievePackage("pinyin", "4.0.0", "mjs").catch(() => {
-      });
-      RetrievePackage("aromanize", "1.0.0", "js").catch(() => {
-      });
-      RetrievePackage("GreekRomanization", "1.0.0", "js").catch(() => {
-      });
+      if (!globalThis.__SL_WEB__) {
+        RetrievePackage("pinyin", "4.0.0", "mjs").catch(() => {
+        });
+        RetrievePackage("aromanize", "1.0.0", "js").catch(() => {
+        });
+        RetrievePackage("GreekRomanization", "1.0.0", "js").catch(() => {
+        });
+      }
       SCRIPT_PRIORITY = [
         "Japanese",
         "Chinese",
@@ -20136,36 +20149,77 @@ ${bgTextLines.join("\n")}` : francText;
     }
     return lyrics;
   }
-  async function fetchPublicLyricsBody(trackId) {
-    const key = String(globalThis.__SL_WEB_KEY__ || "").trim();
-    if (!key) return { kind: "error", code: "web-key", status: 401 };
-    if (key.startsWith("sl_sk_")) return { kind: "error", code: "web-key", status: 401 };
-    let response;
+  function reportFetch(extra) {
     try {
-      response = await fetch(`https://api.spicylyrics.org/v1/lyrics/${encodeURIComponent(trackId)}`, {
-        headers: {
-          Authorization: `Bearer ${key}`,
-          Accept: "application/json"
-        }
-      });
+      const prev = document.documentElement.getAttribute("data-slw-debug");
+      const base = prev ? JSON.parse(prev) : {};
+      document.documentElement.setAttribute(
+        "data-slw-debug",
+        JSON.stringify({ ...base, ...extra, t: Date.now() })
+      );
+      const status2 = document.getElementById("slw-status");
+      if (status2) {
+        status2.textContent = String(extra.statusText || "");
+        status2.hidden = !extra.statusText;
+      }
     } catch {
+    }
+  }
+  async function fetchViaBackground(trackId) {
+    const chromeApi = globalThis.chrome;
+    if (!chromeApi?.runtime?.sendMessage) {
       return { kind: "error", code: "service-unavailable", status: 0 };
     }
+    const response = await new Promise((resolve) => {
+      try {
+        chromeApi.runtime.sendMessage({ type: "fetch-lyrics", trackId }, (result) => {
+          void chromeApi.runtime.lastError;
+          resolve(result);
+        });
+      } catch {
+        resolve(void 0);
+      }
+    });
+    if (!response) return { kind: "error", code: "service-unavailable", status: 0 };
+    if (response.error === "web-key") return { kind: "error", code: "web-key", status: 401 };
     if (response.status === 404) return { kind: "error", code: "lyrics-not-found", status: 404 };
-    if (response.status === 401 || response.status === 403) return { kind: "error", code: "web-key", status: response.status };
+    if (response.status === 401 || response.status === 403) {
+      return { kind: "error", code: "web-key", status: response.status || 401 };
+    }
     if (response.status === 429) return { kind: "error", code: "rate-limited", status: 429 };
-    if (!response.ok) return { kind: "error", code: "status-not-200", status: response.status };
+    if (!response.ok) return { kind: "error", code: "status-not-200", status: response.status || 0 };
     let json;
     try {
-      json = await response.json();
+      json = JSON.parse(response.body || "");
     } catch {
       return { kind: "error", code: "unknown-error", status: 0 };
     }
     const body = json?.Body?.Type || json?.Body?.Content || json?.Body?.Lines ? json.Body : json;
-    if (!body || typeof body !== "object") return { kind: "error", code: "lyrics-not-found", status: 404 };
+    if (!body || typeof body !== "object") {
+      return { kind: "error", code: "lyrics-not-found", status: 404 };
+    }
     return { kind: "ok", lyrics: adaptPublicLyrics(body) };
   }
-  var SOURCE_TO_DESKTOP;
+  async function fetchPublicLyricsBody(trackId) {
+    const existing = inflight.get(trackId);
+    if (existing) return existing;
+    reportFetch({ stage: "lyrics-fetch", trackId, statusText: `S\xF6zler: ${trackId}` });
+    const pending2 = fetchViaBackground(trackId).then((result) => {
+      reportFetch({
+        stage: "lyrics-fetch-done",
+        trackId,
+        result: result.kind,
+        code: result.kind === "error" ? result.code : "ok",
+        statusText: result.kind === "ok" ? "" : `S\xF6zler hatas\u0131: ${result.code}`
+      });
+      return result;
+    }).finally(() => {
+      inflight.delete(trackId);
+    });
+    inflight.set(trackId, pending2);
+    return pending2;
+  }
+  var SOURCE_TO_DESKTOP, inflight;
   var init_publicApi = __esm({
     "src/web/publicApi.ts"() {
       SOURCE_TO_DESKTOP = {
@@ -20173,6 +20227,7 @@ ${bgTextLines.join("\n")}` : francText;
         apple_music: "aml",
         spotify: "spt"
       };
+      inflight = /* @__PURE__ */ new Map();
     }
   });
 
@@ -45884,7 +45939,12 @@ PLAYBACK BAR
       return OpenPage(AppendTo, options);
     }
     cancelPendingPageMount();
-    if (PageView.IsOpened) return;
+    if (PageView.IsOpened) {
+      const livePage = document.getElementById("SpicyLyricsPage");
+      if (livePage?.isConnected && PageContainer?.isConnected) return;
+      PageView.IsOpened = false;
+      PageContainer = null;
+    }
     if (AppendTo === void 0 && !options?.cardMode && Spicetify.Platform?.History?.location?.pathname !== "/SpicyLyrics") {
       return;
     }
@@ -47656,9 +47716,9 @@ PLAYBACK BAR
         if (audioAnalysisCache.has(uri)) {
           return audioAnalysisCache.get(uri);
         }
-        const inflight = audioAnalysisInflightRequests.get(uri);
-        if (inflight) {
-          return inflight;
+        const inflight2 = audioAnalysisInflightRequests.get(uri);
+        if (inflight2) {
+          return inflight2;
         }
         const request = getDynamicAudioAnalysis(uri).then((analysis) => {
           audioAnalysisCache.set(uri, analysis);
@@ -50335,6 +50395,10 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
     const [nowPlayingBarHeight, setNowPlayingBarHeight] = (0, import_react38.useState)(0);
     const isGlobalNav = useStore($isGlobalNav);
     (0, import_react38.useEffect)(() => {
+      if (globalThis.__SL_WEB__) {
+        setNowPlayingBarHeight(88);
+        return;
+      }
       const targetElement = document.querySelector(".Root__now-playing-bar") ?? document.querySelector('[data-testid="now-playing-bar"]')?.parentElement ?? null;
       if (!targetElement) {
         toasterLogger.warn("Could not find the now playing bar in the DOM");
@@ -50841,6 +50905,9 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
 
   // src/utils/SessionManager/index.ts
   async function initSession() {
+    if (globalThis.__SL_WEB__) {
+      return;
+    }
     if (app_default.isDev()) {
       new Logger_default("SessionManager").info("Dev build \u2014 skipping session creation");
       return;
@@ -50895,7 +50962,12 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
     $spicyLyricsVersion.set(window._spicy_lyrics_metadata?.LoadedVersion ?? $spicyLyricsVersion.get());
     window._spicy_lyrics_metadata = {};
     void initSession();
-    LoadFonts();
+    if (globalThis.__SL_WEB__) {
+      $disableNpvLyrics.set(true);
+    }
+    if (!globalThis.__SL_WEB__) {
+      LoadFonts();
+    }
     ApplyFontPixel();
     const skeletonStyle = document.createElement("style");
     skeletonStyle.innerHTML = `
@@ -51408,7 +51480,9 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
         }
         const songUri = event?.data?.item?.uri;
         if (songUri) {
-          fetchLyrics(songUri).then(ApplyLyrics);
+          if (!globalThis.__SL_WEB__ || PageView_default.IsOpened || Fullscreen_default.IsOpen || Fullscreen_default.CinemaViewOpen) {
+            fetchLyrics(songUri).then(ApplyLyrics);
+          }
         }
         const _staticBgMode = $staticBackgroundMode.get();
         if (_staticBgMode !== "off" && !SpotifyPlayer.IsDJ() && (_staticBgMode === "auto" || _staticBgMode === "artistHeader")) {
@@ -51580,9 +51654,17 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
         Session_default.RecordNavigation(Spicetify.Platform.History.location);
         if (globalThis.__SL_WEB__) {
           const openIntoWebRoot = () => {
-            const container = document.querySelector(
-              "#SpicyLyricsWebRoot .main-view-container"
-            );
+            let host = document.getElementById("SpicyLyricsWebRoot");
+            if (!host?.isConnected) {
+              host = document.createElement("div");
+              host.id = "SpicyLyricsWebRoot";
+              host.className = "Root__main-view is-open";
+              host.innerHTML = `<div class="main-view-container"><div class="main-view-container__scroll-node-child"></div></div>`;
+              document.documentElement.append(host);
+            } else {
+              host.classList.add("is-open");
+            }
+            const container = host.querySelector(".main-view-container");
             Spicetify.Platform.History.push({ pathname: "/SpicyLyrics" });
             if (container) {
               void PageView_default.Open(container);
@@ -51590,9 +51672,24 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
               void PageView_default.Open();
             }
           };
+          window.__SL_setOpenImpl?.(openIntoWebRoot);
           window.__SL_open = openIntoWebRoot;
           window.__SL_READY__ = true;
           window.dispatchEvent(new CustomEvent("slweb:ready"));
+          try {
+            document.documentElement.setAttribute(
+              "data-slw-debug",
+              JSON.stringify({
+                web: true,
+                booted: true,
+                ready: true,
+                stage: "ready",
+                page: !!document.getElementById("SpicyLyricsPage"),
+                t: Date.now()
+              })
+            );
+          } catch {
+          }
         }
         Global_default.Event.listen("session:navigation", (data) => {
           if (data.pathname === "/SpicyLyrics/Update") {
@@ -51611,14 +51708,18 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
             setTimeout(CheckForUpdates_Intervaled, jitter(120 * 1e3, 0.2));
           }
         };
-        setTimeout(async () => await CheckForUpdates_Intervaled(), 1e3);
+        if (!globalThis.__SL_WEB__) {
+          setTimeout(async () => await CheckForUpdates_Intervaled(), 1e3);
+        }
       }
     };
     Whentil_default.When(
       () => SpotifyPlayer.GetContentType(),
       () => syncLyricsButtonRegistration()
     );
-    initNPVLyrics();
+    if (!globalThis.__SL_WEB__) {
+      initNPVLyrics();
+    }
     Hometinue();
     runThemeMatcher();
     setTimeout(() => {
@@ -51723,20 +51824,46 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
     if (parts.length === 2) return (parts[0] * 60 + parts[1]) * 1e3;
     return (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1e3;
   }
+  function playerChrome(doc) {
+    return doc.querySelector("[data-testid='now-playing-widget']") || doc.querySelector("[data-testid='now-playing-bar']") || doc.querySelector(".Root__now-playing-bar") || doc.querySelector("footer[data-testid='now-playing-bar']") || doc.querySelector("[data-testid='player-controls']")?.closest("footer, [data-testid='now-playing-bar'], .Root__now-playing-bar") || null;
+  }
+  function readRepeat(doc) {
+    const btn = doc.querySelector("[data-testid='control-button-repeat']");
+    if (!btn) return 0;
+    const pressed = btn.getAttribute("aria-checked") ?? btn.getAttribute("aria-pressed");
+    const label = (btn.getAttribute("aria-label") || "").toLowerCase();
+    if (pressed === "true" || label.includes("one") || label.includes("tek") || label.includes("track")) {
+      if (label.includes("one") || label.includes("tek") || label.includes("track") || label.includes("\u015Fark\u0131")) {
+        return 2;
+      }
+      return 1;
+    }
+    return 0;
+  }
+  function readShuffle(doc) {
+    const btn = doc.querySelector("[data-testid='control-button-shuffle']");
+    if (!btn) return { shuffle: false, smartShuffle: false };
+    const pressed = btn.getAttribute("aria-checked") ?? btn.getAttribute("aria-pressed");
+    const label = (btn.getAttribute("aria-label") || "").toLowerCase();
+    const active = pressed === "true" || /disable|kapat/.test(label);
+    const smart = active && (label.includes("smart") || label.includes("ak\u0131ll\u0131"));
+    return { shuffle: active && !smart, smartShuffle: smart };
+  }
   function readTrack(doc) {
-    const widget = doc.querySelector("[data-testid='now-playing-widget']");
-    const href = widget?.querySelector("a[href*='/track/']")?.getAttribute("href") || "";
-    const trackId = href.match(/\/track\/([A-Za-z0-9]+)/)?.[1] || "";
+    const chrome = playerChrome(doc);
+    if (!chrome) return null;
+    const trackLink = chrome.querySelector("a[data-testid='context-item-link'][href*='/track/']") || chrome.querySelector("a[href*='/track/']");
+    const href = trackLink?.getAttribute("href") || "";
+    const trackId = href.match(/\/track\/([A-Za-z0-9]{22})/)?.[1] || "";
     if (!trackId) {
-      const episode = widget?.querySelector("a[href*='/episode/']");
-      if (episode) return { type: "episode" };
+      if (chrome.querySelector("a[href*='/episode/']")) return { type: "episode" };
       return null;
     }
-    const title = (widget?.querySelector("[data-testid='context-item-link'], [data-testid='context-item-info-title']") || widget?.querySelector("a[href*='/track/']"))?.textContent?.trim() || "";
-    const artist = widget?.querySelector(
+    const title = (chrome.querySelector("[data-testid='context-item-link'], [data-testid='context-item-info-title']") || trackLink)?.textContent?.trim() || "";
+    const artist = chrome.querySelector(
       "[data-testid='context-item-info-artist'] a, [data-testid='context-item-info-artist'], a[href*='/artist/']"
     )?.textContent?.trim() || "";
-    const artUrl = widget?.querySelector("img")?.getAttribute("src") || "";
+    const artUrl = chrome.querySelector("img")?.getAttribute("src") || "";
     const bar = doc.querySelector("[data-testid='playback-progressbar']");
     const nowAttr = Number(bar?.getAttribute("aria-valuenow"));
     const maxAttr = Number(bar?.getAttribute("aria-valuemax"));
@@ -51752,7 +51879,21 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
     }
     const label = (doc.querySelector("[data-testid='control-button-playpause']")?.getAttribute("aria-label") || "").toLowerCase();
     const playing = label.includes("pause") || label.includes("duraklat");
-    return { type: "track", trackId, title, artist, artUrl, positionMs, durationMs, playing };
+    const repeat = readRepeat(doc);
+    const { shuffle, smartShuffle } = readShuffle(doc);
+    return {
+      type: "track",
+      trackId,
+      title,
+      artist,
+      artUrl,
+      positionMs,
+      durationMs,
+      playing,
+      repeat,
+      shuffle,
+      smartShuffle
+    };
   }
   function clickControl(doc, selector) {
     doc.querySelector(selector)?.click();
@@ -51773,51 +51914,87 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
     }
     bar.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true, clientX, clientY }));
   }
-  function installFetchProxy() {
-    const chromeApi = globalThis.chrome;
-    if (!chromeApi?.runtime?.sendMessage) return;
+  function installFetchGuard() {
     const nativeFetch = globalThis.fetch.bind(globalThis);
     globalThis.fetch = (async (input, init2) => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (!url.startsWith("https://api.spicylyrics.org/")) return nativeFetch(input, init2);
-      const headers = {};
-      new Headers(init2?.headers).forEach((value, key) => {
-        headers[key] = value;
-      });
-      let proxied;
-      try {
-        proxied = await chromeApi.runtime.sendMessage({
-          type: "spicy-lyrics-proxy",
-          url,
-          method: init2?.method || "GET",
-          headers,
-          body: typeof init2?.body === "string" ? init2.body : void 0
-        });
-      } catch {
-        return new Response("", { status: 0 });
+      if (url.includes("/query")) {
+        return new Response(JSON.stringify({ error: "web-port-skips-query" }), { status: 418 });
       }
-      return new Response(proxied?.body ?? "", { status: proxied?.status || 0 });
+      if (url.includes("/v1/lyrics/")) {
+        return new Response(JSON.stringify({ error: "use-fetch-lyrics-message" }), {
+          status: 599,
+          headers: { "content-type": "application/json" }
+        });
+      }
+      return new Response("", { status: 204 });
     });
+  }
+  function publishWebDebug(extra = {}) {
+    try {
+      const root2 = document.getElementById("SpicyLyricsWebRoot");
+      const page = document.getElementById("SpicyLyricsPage");
+      const payload = {
+        web: true,
+        booted: !!globalThis.__SL_WEB_BOOTED__,
+        ready: !!globalThis.__SL_READY__,
+        root: !!root2,
+        rootOpen: !!root2?.classList.contains("is-open"),
+        page: !!page,
+        err: document.getElementById("slw-boot-error")?.textContent || null,
+        ...extra,
+        t: Date.now()
+      };
+      document.documentElement.setAttribute("data-slw-debug", JSON.stringify(payload));
+    } catch {
+    }
   }
   function installWebSpicetify() {
     if (globalThis.__SL_WEB__) return;
     globalThis.__SL_WEB__ = true;
-    installFetchProxy();
-    let root2 = document.getElementById("SpicyLyricsWebRoot");
-    if (!root2) {
-      root2 = document.createElement("div");
-      root2.id = "SpicyLyricsWebRoot";
-      root2.className = "Root__main-view";
-      root2.innerHTML = `<div class="main-view-container"><div class="main-view-container__scroll-node-child"></div></div>`;
-      document.documentElement.append(root2);
-    }
+    installFetchGuard();
+    publishWebDebug({ stage: "install-start" });
+    let root2 = null;
+    let wantOpen = false;
+    const ensureRoot = () => {
+      let el = document.getElementById("SpicyLyricsWebRoot");
+      if (!el) {
+        el = document.createElement("div");
+        el.id = "SpicyLyricsWebRoot";
+        el.className = "Root__main-view";
+        el.innerHTML = `<div class="main-view-container"><div class="main-view-container__scroll-node-child"></div></div>`;
+      }
+      if (!el.isConnected || el.ownerDocument !== document) {
+        document.documentElement.append(el);
+      } else if (el.parentElement !== document.documentElement && el.parentElement !== document.body) {
+        document.documentElement.append(el);
+      }
+      if (!document.getElementById("slw-status")) {
+        const status2 = document.createElement("div");
+        status2.id = "slw-status";
+        status2.hidden = true;
+        document.documentElement.append(status2);
+      }
+      el.classList.toggle("is-open", wantOpen);
+      root2 = el;
+      return el;
+    };
+    ensureRoot();
+    new MutationObserver(() => {
+      if (!document.getElementById("SpicyLyricsWebRoot")?.isConnected) ensureRoot();
+    }).observe(document.documentElement, { childList: true, subtree: true });
+    setInterval(() => {
+      if (!document.getElementById("SpicyLyricsWebRoot")?.isConnected) ensureRoot();
+    }, 2e3);
     const listeners = /* @__PURE__ */ new Map();
     const historyListeners = /* @__PURE__ */ new Set();
     const history = {
       location: { pathname: "/" },
       push(next) {
         history.location = { pathname: next.pathname };
-        root2.classList.toggle("is-open", next.pathname === "/SpicyLyrics");
+        wantOpen = next.pathname === "/SpicyLyrics";
+        ensureRoot().classList.toggle("is-open", wantOpen);
         for (const listener of historyListeners) listener(history.location);
       },
       listen(listener) {
@@ -51833,134 +52010,139 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
       timestamp: Date.now(),
       isPaused: true,
       smartShuffle: false,
-      shuffle: false
+      shuffle: false,
+      repeat: 0
     };
     let durationMs = 0;
     const playerData = { item: null };
+    const currentProgress = () => playerState.positionAsOfTimestamp + (playerState.isPaused ? 0 : Math.max(0, Date.now() - playerState.timestamp));
     const emit2 = (type, data) => {
       for (const listener of listeners.get(type) || []) listener({ data });
     };
+    const playerOrigin = {
+      get _state() {
+        return playerState;
+      },
+      seekTo: (ms) => {
+        if (durationMs > 0) seekToRatio(document, ms / durationMs);
+      }
+    };
     const Spicetify2 = {
-      LocalStorage: {
-        get: (key) => localStorage.getItem(key),
-        set: (key, value) => localStorage.setItem(key, value)
-      },
-      Config: { version: "2.46.0", current_theme: "" },
-      Tippy: void 0,
-      TippyProps: {},
-      SVGIcons: {},
-      Keyboard: {
-        KEYS: { ESCAPE: "Escape", F11: "F11" },
-        registerImportantShortcut(key, callback) {
-          document.addEventListener("keydown", (event) => {
-            if (event.key === key) callback();
-          });
-        }
-      },
-      Menu: {
-        Item: class {
-          onClick;
-          constructor(_name, _enabled, onClick) {
-            this.onClick = onClick;
-          }
-          register() {
-          }
-        }
-      },
-      CosmosAsync: {
-        get: async () => null,
-        post: async () => null,
-        put: async () => null,
-        del: async () => null
-      },
-      GraphQL: {
-        Request: async () => null,
-        Definitions: new Proxy({}, { get: () => ({}) })
-      },
-      colorExtractor: async () => ({}),
       Platform: {
-        version: "1.2.70.0",
-        PlatformData: { app_platform: "web" },
         History: history,
-        AuthorizationAPI: {
-          getState: () => ({ isAuthorized: true, token: { accessToken: "web", accessTokenExpirationTimestampMs: Date.now() + 36e5 } })
-        },
-        LibraryAPI: {
-          add: async () => {
-          },
-          remove: async () => {
-          }
-        },
+        version: "1.2.0",
+        // Enough for requestPositionSync / volume listener guards on web.
         PlaybackAPI: {
-          _isLocal: true,
-          _events: { addListener() {
+          _isLocal: false,
+          _events: { addListener: () => {
+          }, removeListener: () => {
           } }
         },
         PlayerAPI: {
-          _state: playerState,
+          get _state() {
+            return playerState;
+          },
           _contextPlayer: {
-            getPositionState: async () => ({ position: playerState.positionAsOfTimestamp }),
-            resume: async () => {
-            }
+            getPositionState: async () => ({ position: currentProgress() }),
+            resume: async () => ({})
           }
         },
-        Session: {}
+        CosmosAsync: {
+          get: async () => ({}),
+          post: async () => ({}),
+          put: async () => ({}),
+          del: async () => ({})
+        },
+        AuthorizationAPI: {
+          getState: async () => ({ isAuthorized: true, token: null })
+        }
+      },
+      CosmosAsync: {
+        get: async () => ({}),
+        post: async () => ({}),
+        put: async () => ({}),
+        del: async () => ({})
       },
       Player: {
         data: playerData,
-        origin: {
-          _state: playerState,
-          seekTo(position) {
-            if (durationMs > 0) seekToRatio(document, position / durationMs);
-          }
+        origin: playerOrigin,
+        get progress() {
+          return currentProgress();
         },
+        get duration() {
+          return durationMs;
+        },
+        get track() {
+          return playerData.item;
+        },
+        getProgress: () => currentProgress(),
+        getProgressPercent: () => durationMs > 0 ? currentProgress() / durationMs : 0,
+        getRepeat: () => playerState.repeat,
+        getShuffle: () => playerState.shuffle,
         isPlaying: () => !playerState.isPaused,
-        getProgress: () => playerState.positionAsOfTimestamp,
-        getRepeat: () => 0,
-        getHeart: () => false,
-        getVolume: () => 1,
-        pause: () => clickControl(document, "[data-testid='control-button-playpause']"),
         play: () => clickControl(document, "[data-testid='control-button-playpause']"),
+        pause: () => clickControl(document, "[data-testid='control-button-playpause']"),
         togglePlay: () => clickControl(document, "[data-testid='control-button-playpause']"),
         next: () => clickControl(document, "[data-testid='control-button-skip-forward']"),
         back: () => clickControl(document, "[data-testid='control-button-skip-back']"),
-        setShuffle() {
+        seek: (ms) => {
+          if (durationMs > 0) seekToRatio(document, ms / durationMs);
         },
-        setRepeat() {
+        getHeart: () => false,
+        addEventListener: (type, cb) => {
+          if (!listeners.has(type)) listeners.set(type, /* @__PURE__ */ new Set());
+          listeners.get(type).add(cb);
         },
-        setVolume() {
-        },
-        setMute() {
-        },
-        addEventListener(type, listener) {
-          const bucket = listeners.get(type) || /* @__PURE__ */ new Set();
-          bucket.add(listener);
-          listeners.set(type, bucket);
-        },
-        removeEventListener(type, listener) {
-          listeners.get(type)?.delete(listener);
-        },
-        dispatchEvent(type, data) {
-          emit2(type, data);
+        removeEventListener: (type, cb) => {
+          listeners.get(type)?.delete(cb);
         }
-      }
+      },
+      LocalStorage: {
+        get: (key) => {
+          try {
+            return localStorage.getItem(`slw:${key}`);
+          } catch {
+            return null;
+          }
+        },
+        set: (key, value) => {
+          try {
+            localStorage.setItem(`slw:${key}`, value);
+          } catch {
+          }
+        }
+      },
+      Keyboard: {
+        KEYS: { ESCAPE: "Escape", F11: "F11" },
+        registerImportantShortcut: () => {
+        }
+      },
+      Tippy: void 0,
+      TippyProps: {},
+      colorExtractor: async () => ({ VIBRANT_NON_ALARMING: "#999999" })
     };
     globalThis.Spicetify = Spicetify2;
     let lastUri = "";
     let lastPlaying = false;
+    let missingPolls = 0;
     const poll = () => {
       const snap = readTrack(document);
       if (!snap || snap.type !== "track") {
-        if (playerData.item?.type === "track") {
-          playerData.item = snap?.type === "episode" ? { type: "episode", uri: "", mediaType: "audio" } : null;
+        missingPolls += 1;
+        if (missingPolls >= 6 && playerData.item?.type === "track") {
+          playerData.item = null;
           lastUri = "";
         }
         return;
       }
+      missingPolls = 0;
       durationMs = snap.durationMs;
       playerState.positionAsOfTimestamp = snap.positionMs;
       playerState.timestamp = Date.now();
       playerState.isPaused = !snap.playing;
+      playerState.repeat = snap.repeat;
+      playerState.shuffle = snap.shuffle;
+      playerState.smartShuffle = snap.smartShuffle;
       const uri = `spotify:track:${snap.trackId}`;
       const item = {
         type: "track",
@@ -51984,44 +52166,101 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
       }
     };
     poll();
-    setInterval(poll, 200);
-    const openLyrics = () => {
+    setInterval(poll, 500);
+    let openImpl = () => {
+      ensureRoot();
       history.push({ pathname: "/SpicyLyrics" });
     };
+    const closeLyrics = () => {
+      ensureRoot();
+      history.goBack();
+      const status2 = document.getElementById("slw-status");
+      if (status2) status2.hidden = true;
+    };
+    const openLyrics = () => {
+      openImpl();
+      publishWebDebug({ stage: "open", pathname: history.location.pathname, trackId: lastUri });
+    };
     const toggleLyrics = () => {
-      if (history.location.pathname === "/SpicyLyrics") history.goBack();
-      else openLyrics();
+      const now2 = Date.now();
+      if (now2 - Number(window.__SL_TOGGLE_AT || 0) < 500) return;
+      window.__SL_TOGGLE_AT = now2;
+      if (history.location.pathname === "/SpicyLyrics" && root2?.classList.contains("is-open")) {
+        closeLyrics();
+      } else {
+        openLyrics();
+      }
     };
     const syncOpenButton = () => {
       const open = history.location.pathname === "/SpicyLyrics";
-      document.getElementById("slw-open-button")?.setAttribute("aria-pressed", open ? "true" : "false");
+      for (const id of ["slw-open-button", "slw-toggle"]) {
+        const btn = document.getElementById(id);
+        btn?.setAttribute("aria-pressed", open ? "true" : "false");
+        if (btn && btn.textContent !== "Y\xFCkleniyor\u2026") {
+          btn.textContent = open ? "Kapat" : "S\xF6zler";
+        }
+      }
     };
     const originalPush = history.push.bind(history);
     history.push = (next) => {
       originalPush(next);
       syncOpenButton();
     };
+    window.__SL_setOpenImpl = (fn) => {
+      openImpl = fn;
+    };
     window.__SL_open = openLyrics;
+    window.__SL_close = closeLyrics;
     window.__SL_toggle = toggleLyrics;
-    window.addEventListener("slw-open", toggleLyrics);
+    window.addEventListener("slw-open", openLyrics);
+    window.addEventListener("slw-force-open", openLyrics);
+    window.addEventListener("slw-toggle", toggleLyrics);
+    document.addEventListener(
+      "click",
+      (event) => {
+        const target = event.target;
+        if (!target?.closest?.("#slw-open-button, #slw-toggle")) return;
+        event.preventDefault();
+        event.stopPropagation();
+        event.stopImmediatePropagation();
+        toggleLyrics();
+      },
+      true
+    );
+    const chromeApi = globalThis.chrome;
+    chromeApi?.runtime?.onMessage?.addListener(
+      (message, _sender, sendResponse) => {
+        if (message?.type === "slw-force-open" || message?.type === "slw-open") {
+          openLyrics();
+          sendResponse?.({ ok: true });
+          return true;
+        }
+        if (message?.type === "toggle") {
+          toggleLyrics();
+          sendResponse?.({ ok: true });
+          return true;
+        }
+        return void 0;
+      }
+    );
   }
 
   // src/web/overlay.css
   var style = document.createElement("style");
-  style.textContent = '#SpicyLyricsWebRoot {\n  position: fixed;\n  z-index: 9999;\n  inset: 0 0 88px 0;\n  display: none;\n  background: #000;\n  overflow: hidden;\n  color: #fff;\n}\n\n#SpicyLyricsWebRoot.is-open {\n  display: block;\n}\n\n#SpicyLyricsWebRoot.Root__main-view,\n#SpicyLyricsWebRoot .main-view-container,\n#SpicyLyricsWebRoot .main-view-container__scroll-node-child {\n  width: 100% !important;\n  height: 100% !important;\n  position: relative !important;\n  overflow: hidden !important;\n  margin: 0 !important;\n  padding: 0 !important;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage {\n  position: absolute !important;\n  inset: 0 !important;\n  width: 100% !important;\n  height: 100% !important;\n  opacity: 1 !important;\n  visibility: visible !important;\n  z-index: 1;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage .ContentBox {\n  opacity: 1 !important;\n  visibility: visible !important;\n}\n\n#slw-open-button {\n  position: fixed;\n  right: 24px;\n  bottom: 96px;\n  z-index: 2147483646;\n  margin: 0;\n  border: 0;\n  border-radius: 999px;\n  padding: 12px 16px;\n  background: #1ed760;\n  color: #000;\n  font: 700 14px/1 "Helvetica Neue", sans-serif;\n  cursor: pointer;\n}\n\n#slw-open-button[aria-pressed="true"] {\n  background: #1ed760;\n}\n';
+  style.textContent = '#SpicyLyricsWebRoot {\n  position: fixed;\n  z-index: 2147483000;\n  inset: 0 0 88px 0;\n  display: none;\n  background: #000;\n  overflow: hidden;\n  color: #fff;\n  pointer-events: auto;\n}\n\n#SpicyLyricsWebRoot.is-open {\n  display: block;\n}\n\n#SpicyLyricsWebRoot.Root__main-view,\n#SpicyLyricsWebRoot .main-view-container,\n#SpicyLyricsWebRoot .main-view-container__scroll-node-child {\n  width: 100% !important;\n  height: 100% !important;\n  position: relative !important;\n  overflow: hidden !important;\n  margin: 0 !important;\n  padding: 0 !important;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage {\n  position: absolute !important;\n  inset: 0 !important;\n  width: 100% !important;\n  height: 100% !important;\n  opacity: 1 !important;\n  visibility: visible !important;\n  z-index: 1;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage .ContentBox {\n  opacity: 1 !important;\n  visibility: visible !important;\n  display: flex !important;\n  flex-direction: row !important;\n  width: 100% !important;\n  height: 100% !important;\n}\n\n/* Center lyrics column must take remaining space (NowBar is the side). */\n#SpicyLyricsWebRoot #SpicyLyricsPage .LyricsContainer {\n  flex: 1 1 auto !important;\n  min-width: 0 !important;\n  width: auto !important;\n  height: 100% !important;\n  opacity: 1 !important;\n  visibility: visible !important;\n  display: flex !important;\n  position: relative !important;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage .LyricsContainer.Hidden {\n  display: flex !important;\n  opacity: 1 !important;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage .LyricsContainer .LyricsContent,\n#SpicyLyricsWebRoot #SpicyLyricsPage .lyricsParent,\n#SpicyLyricsWebRoot #SpicyLyricsPage .lyrics {\n  opacity: 1 !important;\n  visibility: visible !important;\n  width: 100% !important;\n  height: 100% !important;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage .NowBar {\n  flex: 0 0 auto !important;\n}\n\n#slw-status {\n  position: fixed;\n  left: 50%;\n  bottom: 110px;\n  transform: translateX(-50%);\n  z-index: 2147483645;\n  max-width: min(560px, calc(100vw - 32px));\n  padding: 10px 14px;\n  border-radius: 10px;\n  background: rgba(20, 20, 20, 0.92);\n  color: #fff;\n  font: 600 13px/1.35 Helvetica, Arial, sans-serif;\n  pointer-events: none;\n}\n\n#slw-open-button {\n  position: fixed;\n  right: 24px;\n  bottom: 96px;\n  z-index: 2147483646;\n  margin: 0;\n  border: 0;\n  border-radius: 999px;\n  padding: 12px 16px;\n  background: #1ed760;\n  color: #000;\n  font: 700 14px/1 "Helvetica Neue", sans-serif;\n  cursor: pointer;\n}\n\n#slw-open-button[aria-pressed="true"] {\n  background: #1ed760;\n}\n';
   document.documentElement.append(style);
 
   // src/web/boot.ts
-  function waitForReady(timeoutMs = 15e3) {
-    if (window.__SL_READY__) return Promise.resolve();
-    return new Promise((resolve, reject) => {
+  function waitForReady(timeoutMs = 2e4) {
+    if (window.__SL_READY__) return Promise.resolve(true);
+    return new Promise((resolve) => {
       const onReady = () => {
         cleanup();
-        resolve();
+        resolve(true);
       };
       const timer = window.setTimeout(() => {
         cleanup();
-        reject(new Error("Spicy Lyrics haz\u0131r olmad\u0131 (zaman a\u015F\u0131m\u0131)"));
+        resolve(false);
       }, timeoutMs);
       const cleanup = () => {
         window.clearTimeout(timer);
@@ -52030,13 +52269,25 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
       window.addEventListener("slweb:ready", onReady);
     });
   }
-  async function boot() {
-    if (window.__SL_WEB_BOOTED__) {
-      window.__SL_open?.();
-      return;
+  function showBootError(message) {
+    let box = document.getElementById("slw-boot-error");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "slw-boot-error";
+      box.style.cssText = "position:fixed;right:24px;bottom:160px;z-index:2147483647;max-width:360px;padding:12px 14px;border-radius:12px;background:#300;color:#fff;font:13px/1.4 Helvetica,sans-serif";
+      document.documentElement.append(box);
     }
+    box.textContent = message;
+  }
+  async function boot() {
+    if (window.__SL_WEB_BOOTED__) return;
     try {
       installWebSpicetify();
+      window.__SL_WEB_BOOTED__ = true;
+      document.documentElement.setAttribute(
+        "data-slw-debug",
+        JSON.stringify({ web: true, booted: true, stage: "booted", t: Date.now() })
+      );
       const chromeApi = globalThis.chrome;
       if (chromeApi?.storage?.local) {
         const stored = await chromeApi.storage.local.get("publishableKey");
@@ -52050,16 +52301,15 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
         );
       }
       await Promise.resolve().then(() => (init_app2(), app_exports));
-      await waitForReady();
-      window.__SL_WEB_BOOTED__ = true;
-      window.__SL_open?.();
+      const ready = await waitForReady();
+      if (!ready) {
+        showBootError("Spicy Lyrics yava\u015F a\xE7\u0131l\u0131yor \u2014 ye\u015Fil butona tekrar bas.");
+      }
     } catch (error) {
       console.error("Spicy Lyrics Web failed to boot", error);
-      const box = document.createElement("div");
-      box.id = "slw-boot-error";
-      box.style.cssText = "position:fixed;right:24px;bottom:160px;z-index:2147483647;max-width:360px;padding:12px 14px;border-radius:12px;background:#300;color:#fff;font:13px/1.4 Helvetica,sans-serif";
-      box.textContent = `Spicy Lyrics a\xE7\u0131lamad\u0131: ${error instanceof Error ? error.message : String(error)}`;
-      document.documentElement.append(box);
+      showBootError(
+        `Spicy Lyrics a\xE7\u0131lamad\u0131: ${error instanceof Error ? error.message : String(error)}`
+      );
     }
   }
   void boot();

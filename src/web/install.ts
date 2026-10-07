@@ -8,27 +8,65 @@ function parseClock(text: string | null | undefined): number | null {
   return (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
 }
 
-/** Only the now-playing chip — never search results / playlist rows. */
-function readTrack(doc: Document) {
-  const widget = doc.querySelector("[data-testid='now-playing-widget']");
-  if (!widget) return null;
+/** Player chrome only — never search results / playlist rows. */
+function playerChrome(doc: Document): Element | null {
+  return (
+    doc.querySelector("[data-testid='now-playing-widget']") ||
+    doc.querySelector("[data-testid='now-playing-bar']") ||
+    doc.querySelector(".Root__now-playing-bar") ||
+    doc.querySelector("footer[data-testid='now-playing-bar']") ||
+    doc.querySelector("[data-testid='player-controls']")?.closest("footer, [data-testid='now-playing-bar'], .Root__now-playing-bar") ||
+    null
+  );
+}
 
-  const trackLink = widget.querySelector<HTMLAnchorElement>("a[href*='/track/']");
+function readRepeat(doc: Document): number {
+  const btn = doc.querySelector<HTMLElement>("[data-testid='control-button-repeat']");
+  if (!btn) return 0;
+  const pressed = btn.getAttribute("aria-checked") ?? btn.getAttribute("aria-pressed");
+  const label = (btn.getAttribute("aria-label") || "").toLowerCase();
+  if (pressed === "true" || label.includes("one") || label.includes("tek") || label.includes("track")) {
+    if (label.includes("one") || label.includes("tek") || label.includes("track") || label.includes("şarkı")) {
+      return 2;
+    }
+    return 1;
+  }
+  return 0;
+}
+
+function readShuffle(doc: Document): { shuffle: boolean; smartShuffle: boolean } {
+  const btn = doc.querySelector<HTMLElement>("[data-testid='control-button-shuffle']");
+  if (!btn) return { shuffle: false, smartShuffle: false };
+  const pressed = btn.getAttribute("aria-checked") ?? btn.getAttribute("aria-pressed");
+  const label = (btn.getAttribute("aria-label") || "").toLowerCase();
+  // Active buttons are labeled "Disable…" / "…kapat"
+  const active = pressed === "true" || /disable|kapat/.test(label);
+  const smart = active && (label.includes("smart") || label.includes("akıllı"));
+  return { shuffle: active && !smart, smartShuffle: smart };
+}
+
+function readTrack(doc: Document) {
+  const chrome = playerChrome(doc);
+  if (!chrome) return null;
+
+  const trackLink =
+    chrome.querySelector<HTMLAnchorElement>("a[data-testid='context-item-link'][href*='/track/']") ||
+    chrome.querySelector<HTMLAnchorElement>("a[href*='/track/']");
   const href = trackLink?.getAttribute("href") || "";
-  const trackId = href.match(/\/track\/([A-Za-z0-9]+)/)?.[1] || "";
+  const trackId = href.match(/\/track\/([A-Za-z0-9]{22})/)?.[1] || "";
   if (!trackId) {
-    if (widget.querySelector("a[href*='/episode/']")) return { type: "episode" as const };
+    if (chrome.querySelector("a[href*='/episode/']")) return { type: "episode" as const };
     return null;
   }
 
   const title = (
-    widget.querySelector("[data-testid='context-item-link'], [data-testid='context-item-info-title']")
+    chrome.querySelector("[data-testid='context-item-link'], [data-testid='context-item-info-title']")
     || trackLink
   )?.textContent?.trim() || "";
-  const artist = widget.querySelector(
+  const artist = chrome.querySelector(
     "[data-testid='context-item-info-artist'] a, [data-testid='context-item-info-artist'], a[href*='/artist/']",
   )?.textContent?.trim() || "";
-  const artUrl = widget.querySelector("img")?.getAttribute("src") || "";
+  const artUrl = chrome.querySelector("img")?.getAttribute("src") || "";
   const bar = doc.querySelector("[data-testid='playback-progressbar']");
   const nowAttr = Number(bar?.getAttribute("aria-valuenow"));
   const maxAttr = Number(bar?.getAttribute("aria-valuemax"));
@@ -52,7 +90,21 @@ function readTrack(doc: Document) {
     doc.querySelector("[data-testid='control-button-playpause']")?.getAttribute("aria-label") || ""
   ).toLowerCase();
   const playing = label.includes("pause") || label.includes("duraklat");
-  return { type: "track" as const, trackId, title, artist, artUrl, positionMs, durationMs, playing };
+  const repeat = readRepeat(doc);
+  const { shuffle, smartShuffle } = readShuffle(doc);
+  return {
+    type: "track" as const,
+    trackId,
+    title,
+    artist,
+    artUrl,
+    positionMs,
+    durationMs,
+    playing,
+    repeat,
+    shuffle,
+    smartShuffle,
+  };
 }
 
 function clickControl(doc: Document, selector: string) {
@@ -182,18 +234,46 @@ export function installWebSpicetify() {
     isPaused: true,
     smartShuffle: false,
     shuffle: false,
+    repeat: 0,
   };
   let durationMs = 0;
   const playerData: any = { item: null };
 
+  const currentProgress = () =>
+    playerState.positionAsOfTimestamp +
+    (playerState.isPaused ? 0 : Math.max(0, Date.now() - playerState.timestamp));
+
   const emit = (type: string, data?: any) => {
     for (const listener of listeners.get(type) || []) listener({ data });
+  };
+
+  const playerOrigin = {
+    get _state() {
+      return playerState;
+    },
+    seekTo: (ms: number) => {
+      if (durationMs > 0) seekToRatio(document, ms / durationMs);
+    },
   };
 
   const Spicetify: any = {
     Platform: {
       History: history,
       version: "1.2.0",
+      // Enough for requestPositionSync / volume listener guards on web.
+      PlaybackAPI: {
+        _isLocal: false,
+        _events: { addListener: () => {}, removeListener: () => {} },
+      },
+      PlayerAPI: {
+        get _state() {
+          return playerState;
+        },
+        _contextPlayer: {
+          getPositionState: async () => ({ position: currentProgress() }),
+          resume: async () => ({}),
+        },
+      },
       CosmosAsync: {
         get: async () => ({}),
         post: async () => ({}),
@@ -212,8 +292,9 @@ export function installWebSpicetify() {
     },
     Player: {
       data: playerData,
+      origin: playerOrigin,
       get progress() {
-        return playerState.positionAsOfTimestamp + (playerState.isPaused ? 0 : Date.now() - playerState.timestamp);
+        return currentProgress();
       },
       get duration() {
         return durationMs;
@@ -221,6 +302,10 @@ export function installWebSpicetify() {
       get track() {
         return playerData.item;
       },
+      getProgress: () => currentProgress(),
+      getProgressPercent: () => (durationMs > 0 ? currentProgress() / durationMs : 0),
+      getRepeat: () => playerState.repeat,
+      getShuffle: () => playerState.shuffle,
       isPlaying: () => !playerState.isPaused,
       play: () => clickControl(document, "[data-testid='control-button-playpause']"),
       pause: () => clickControl(document, "[data-testid='control-button-playpause']"),
@@ -268,19 +353,26 @@ export function installWebSpicetify() {
 
   let lastUri = "";
   let lastPlaying = false;
+  let missingPolls = 0;
   const poll = () => {
     const snap = readTrack(document);
     if (!snap || snap.type !== "track") {
-      if (playerData.item?.type === "track") {
+      // Keep last track through brief DOM churn (cinema/fullscreen transitions).
+      missingPolls += 1;
+      if (missingPolls >= 6 && playerData.item?.type === "track") {
         playerData.item = null;
         lastUri = "";
       }
       return;
     }
+    missingPolls = 0;
     durationMs = snap.durationMs;
     playerState.positionAsOfTimestamp = snap.positionMs;
     playerState.timestamp = Date.now();
     playerState.isPaused = !snap.playing;
+    playerState.repeat = snap.repeat;
+    playerState.shuffle = snap.shuffle;
+    playerState.smartShuffle = snap.smartShuffle;
     const uri = `spotify:track:${snap.trackId}`;
     const item = {
       type: "track",

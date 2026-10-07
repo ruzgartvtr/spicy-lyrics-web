@@ -18,7 +18,7 @@ await esbuild.build({
   entryPoints: ["src/web/boot.ts"],
   outfile: "web-extension/dist/spicy-lyrics.web.js",
   bundle: true,
-  format: "esm",
+  format: "iife",
   platform: "browser",
   target: "chrome120",
   jsx: "automatic",

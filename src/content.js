@@ -54,7 +54,8 @@ toggle.id = "slw-toggle";
 toggle.type = "button";
 toggle.setAttribute("aria-pressed", "false");
 toggle.setAttribute("aria-label", "Spicy Lyrics");
-toggle.textContent = "Lyrics";
+toggle.textContent = "Sözler";
+toggle.style.cssText = "position:fixed;right:24px;bottom:96px;z-index:2147483646;border:0;border-radius:999px;padding:12px 16px;background:#1ed760;color:#000;font:700 14px/1 Helvetica,sans-serif;cursor:pointer;";
 
 let open = sessionStorage.getItem("slw-open") === "1";
 let offsetMs = 0;
@@ -93,9 +94,7 @@ chrome.runtime.onMessage.addListener((message) => {
 });
 
 function placeToggle() {
-  if (toggle.isConnected) return;
-  const widget = document.querySelector("[data-testid='now-playing-widget']");
-  if (widget) widget.append(toggle);
+  if (!toggle.isConnected) document.documentElement.append(toggle);
 }
 
 function currentTime() {
@@ -158,6 +157,7 @@ function frame() {
   requestAnimationFrame(frame);
 }
 
+placeToggle();
 setOpen(open);
 setInterval(syncPlayer, 200);
 requestAnimationFrame(frame);

@@ -25,12 +25,16 @@ function readRepeat(doc: Document): number {
   if (!btn) return 0;
   const pressed = btn.getAttribute("aria-checked") ?? btn.getAttribute("aria-pressed");
   const label = (btn.getAttribute("aria-label") || "").toLowerCase();
-  if (pressed === "true" || label.includes("one") || label.includes("tek") || label.includes("track")) {
-    if (label.includes("one") || label.includes("tek") || label.includes("track") || label.includes("şarkı")) {
-      return 2;
-    }
-    return 1;
+  if (
+    pressed === "mixed" ||
+    label.includes("one") ||
+    label.includes("tek") ||
+    /\btrack\b/.test(label) ||
+    label.includes("şarkı")
+  ) {
+    return 2;
   }
+  if (pressed === "true" || /disable|kapat/.test(label)) return 1;
   return 0;
 }
 

@@ -51750,13 +51750,18 @@ function installFetchProxy() {
     new Headers(init2?.headers).forEach((value, key) => {
       headers[key] = value;
     });
-    const proxied = await chromeApi2.runtime.sendMessage({
-      type: "spicy-lyrics-proxy",
-      url,
-      method: init2?.method || "GET",
-      headers,
-      body: typeof init2?.body === "string" ? init2.body : void 0
-    });
+    let proxied;
+    try {
+      proxied = await chromeApi2.runtime.sendMessage({
+        type: "spicy-lyrics-proxy",
+        url,
+        method: init2?.method || "GET",
+        headers,
+        body: typeof init2?.body === "string" ? init2.body : void 0
+      });
+    } catch {
+      return new Response("", { status: 0 });
+    }
     return new Response(proxied?.body ?? "", { status: proxied?.status || 0 });
   });
 }

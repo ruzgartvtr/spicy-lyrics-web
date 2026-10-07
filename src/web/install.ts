@@ -75,13 +75,18 @@ function installFetchProxy() {
     new Headers(init?.headers).forEach((value, key) => {
       headers[key] = value;
     });
-    const proxied = await chromeApi.runtime.sendMessage({
-      type: "spicy-lyrics-proxy",
-      url,
-      method: init?.method || "GET",
-      headers,
-      body: typeof init?.body === "string" ? init.body : undefined,
-    });
+    let proxied: { body?: string; status?: number } | undefined;
+    try {
+      proxied = await chromeApi.runtime.sendMessage({
+        type: "spicy-lyrics-proxy",
+        url,
+        method: init?.method || "GET",
+        headers,
+        body: typeof init?.body === "string" ? init.body : undefined,
+      });
+    } catch {
+      return new Response("", { status: 0 });
+    }
     return new Response(proxied?.body ?? "", { status: proxied?.status || 0 });
   }) as typeof fetch;
 }

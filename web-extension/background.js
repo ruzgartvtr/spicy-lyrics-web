@@ -9,9 +9,17 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     headers: message.headers || {},
     body: message.body,
   }).then(async (response) => {
-    sendResponse({ status: response.status, body: await response.text() });
+    try {
+      sendResponse({ status: response.status, body: await response.text() });
+    } catch {
+      // The Spotify tab closed before the lyrics response arrived.
+    }
   }).catch(() => {
-    sendResponse({ status: 0, body: "" });
+    try {
+      sendResponse({ status: 0, body: "" });
+    } catch {
+      // The Spotify tab closed before the lyrics response arrived.
+    }
   });
   return true;
 });

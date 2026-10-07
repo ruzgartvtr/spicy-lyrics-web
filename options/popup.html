@@ -1,15 +1,27 @@
 <!doctype html>
-<html lang="en">
+<html lang="tr">
   <head>
     <meta charset="utf-8">
     <title>Spicy Lyrics Web</title>
-    <link rel="stylesheet" href="options.css">
+    <style>
+      body { margin: 0; width: 280px; font: 14px/1.4 Helvetica, sans-serif; background: #121212; color: #fff; }
+      main { padding: 16px; }
+      button {
+        width: 100%; border: 0; border-radius: 999px; padding: 14px 16px;
+        background: #1ed760; color: #000; font: 700 15px/1 Helvetica, sans-serif; cursor: pointer;
+      }
+      button:disabled { opacity: 0.5; cursor: default; }
+      p { margin: 12px 0 0; color: #b3b3b3; }
+      a { color: #1ed760; }
+      #status { min-height: 1.2em; color: #ffd166; }
+    </style>
   </head>
   <body>
     <main>
-      <h1>Spicy Lyrics</h1>
-      <p>Open Spotify Web, then use the Lyrics button on the now-playing bar. Alt+Shift+L toggles the panel.</p>
-      <p><a id="options" href="options.html">Extension options</a></p>
+      <button id="open" type="button">Sözler'i aç</button>
+      <p id="status"></p>
+      <p>Spotify Web sekmesindeyken bu düğmeye bas. Yer imi gerekmez.</p>
+      <p><a id="options" href="options.html">Anahtar ayarları</a></p>
     </main>
     <script src="popup.js"></script>
   </body>

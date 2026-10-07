@@ -1172,12 +1172,25 @@ body:has(#SpicyLyricsPage.Fullscreen) aside.NowPlayingView .spicy-dynamic-bg {
 
   // src/utils/tooltip.ts
   function createTooltip(target, props) {
-    const tooltip = Spicetify.Tippy?.(target, props);
-    tooltip?.popper?.classList.add("SpicyLyrics_Tooltip");
+    const tippyFactory = globalThis.Spicetify?.Tippy;
+    if (typeof tippyFactory !== "function") return emptyTooltip;
+    const tooltip = tippyFactory(target, props);
+    if (!tooltip) return emptyTooltip;
+    tooltip.popper?.classList?.add("SpicyLyrics_Tooltip");
     return tooltip;
   }
+  var emptyTooltip;
   var init_tooltip = __esm({
     "src/utils/tooltip.ts"() {
+      emptyTooltip = {
+        setContent(_content) {
+        },
+        destroy() {
+        },
+        setProps(_props) {
+        },
+        popper: null
+      };
     }
   });
 
@@ -42123,7 +42136,11 @@ ${bgTextLines.join("\n")}` : francText;
           }, 50);
         }
       };
-      customElements.define("sl-generic-modal", _HTMLGenericModal);
+      if (typeof customElements !== "undefined" && customElements && typeof customElements.define === "function") {
+        if (!customElements.get("sl-generic-modal")) {
+          customElements.define("sl-generic-modal", _HTMLGenericModal);
+        }
+      }
       PopupModal = new _HTMLGenericModal();
     }
   });
@@ -51766,9 +51783,32 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
       return new Response(proxied?.body ?? "", { status: proxied?.status || 0 });
     });
   }
+  function ensureCustomElements() {
+    if (typeof customElements !== "undefined" && customElements && typeof customElements.define === "function") {
+      return;
+    }
+    const registry = /* @__PURE__ */ new Map();
+    globalThis.customElements = {
+      define(name, ctor) {
+        registry.set(name, ctor);
+      },
+      get(name) {
+        return registry.get(name);
+      },
+      whenDefined() {
+        return Promise.resolve();
+      },
+      upgrade() {
+      },
+      get get() {
+        return (name) => registry.get(name);
+      }
+    };
+  }
   function installWebSpicetify() {
     if (globalThis.__SL_WEB__) return;
     globalThis.__SL_WEB__ = true;
+    ensureCustomElements();
     installFetchProxy();
     let root2 = document.getElementById("SpicyLyricsWebRoot");
     if (!root2) {

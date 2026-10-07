@@ -39,6 +39,21 @@
   visibility: visible !important;
 }
 
+#slw-status {
+  position: fixed;
+  left: 50%;
+  bottom: 110px;
+  transform: translateX(-50%);
+  z-index: 2147483645;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(20, 20, 20, 0.92);
+  color: #fff;
+  font: 600 13px/1.35 Helvetica, Arial, sans-serif;
+  pointer-events: none;
+}
+
 #slw-open-button {
   position: fixed;
   right: 24px;

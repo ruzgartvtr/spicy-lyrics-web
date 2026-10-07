@@ -8,24 +8,54 @@ function parseClock(text: string | null | undefined): number | null {
   return (parts[0] * 3600 + parts[1] * 60 + parts[2]) * 1000;
 }
 
+function findTrackAnchor(doc: Document): HTMLAnchorElement | null {
+  const scopes = [
+    doc.querySelector("[data-testid='now-playing-widget']"),
+    doc.querySelector("[data-testid='now-playing-bar']"),
+    doc.querySelector("footer"),
+    doc.querySelector("[data-testid='player-controls']")?.closest("footer, aside, div"),
+    doc.body,
+  ].filter(Boolean) as Element[];
+
+  for (const scope of scopes) {
+    const direct = scope.querySelector<HTMLAnchorElement>("a[href*='/track/']");
+    if (direct?.getAttribute("href")?.includes("/track/")) return direct;
+  }
+  return doc.querySelector<HTMLAnchorElement>("a[href*='/track/']");
+}
+
 function readTrack(doc: Document) {
-  const widget = doc.querySelector("[data-testid='now-playing-widget']");
-  const href = widget?.querySelector("a[href*='/track/']")?.getAttribute("href") || "";
+  const widget =
+    doc.querySelector("[data-testid='now-playing-widget']") ||
+    doc.querySelector("[data-testid='now-playing-bar']") ||
+    findTrackAnchor(doc)?.closest("[data-testid], footer, aside") ||
+    null;
+
+  const trackLink = (widget?.querySelector("a[href*='/track/']") as HTMLAnchorElement | null) || findTrackAnchor(doc);
+  const href = trackLink?.getAttribute("href") || "";
   const trackId = href.match(/\/track\/([A-Za-z0-9]+)/)?.[1] || "";
   if (!trackId) {
-    const episode = widget?.querySelector("a[href*='/episode/']");
+    const episode =
+      widget?.querySelector("a[href*='/episode/']") || doc.querySelector("a[href*='/episode/']");
     if (episode) return { type: "episode" as const };
     return null;
   }
   const title = (
     widget?.querySelector("[data-testid='context-item-link'], [data-testid='context-item-info-title']")
-    || widget?.querySelector("a[href*='/track/']")
+    || trackLink
+  )?.textContent?.trim() || trackLink?.getAttribute("aria-label")?.trim() || "";
+  const artist = (
+    widget?.querySelector(
+      "[data-testid='context-item-info-artist'] a, [data-testid='context-item-info-artist'], a[href*='/artist/']",
+    ) || doc.querySelector("[data-testid='context-item-info-artist'] a, a[href*='/artist/']")
   )?.textContent?.trim() || "";
-  const artist = widget?.querySelector(
-    "[data-testid='context-item-info-artist'] a, [data-testid='context-item-info-artist'], a[href*='/artist/']",
-  )?.textContent?.trim() || "";
-  const artUrl = widget?.querySelector("img")?.getAttribute("src") || "";
-  const bar = doc.querySelector("[data-testid='playback-progressbar']");
+  const artUrl =
+    widget?.querySelector("img")?.getAttribute("src") ||
+    doc.querySelector("[data-testid='now-playing-widget'] img, [data-testid='cover-art-button'] img")?.getAttribute("src") ||
+    "";
+  const bar =
+    doc.querySelector("[data-testid='playback-progressbar']") ||
+    doc.querySelector("[data-testid='progress-bar']");
   const nowAttr = Number(bar?.getAttribute("aria-valuenow"));
   const maxAttr = Number(bar?.getAttribute("aria-valuemax"));
   const positionFromText = parseClock(doc.querySelector("[data-testid='playback-position']")?.textContent);
@@ -38,8 +68,14 @@ function readTrack(doc: Document) {
   } else if (Number.isFinite(maxAttr) && maxAttr > 0 && maxAttr <= 100 && Number.isFinite(nowAttr) && durationMs > 0) {
     positionMs = (nowAttr / maxAttr) * durationMs;
   }
-  const label = (doc.querySelector("[data-testid='control-button-playpause']")?.getAttribute("aria-label") || "").toLowerCase();
-  const playing = label.includes("pause") || label.includes("duraklat");
+  const label = (
+    doc.querySelector("[data-testid='control-button-playpause']")?.getAttribute("aria-label") || ""
+  ).toLowerCase();
+  const playing =
+    label.includes("pause") ||
+    label.includes("duraklat") ||
+    label.includes("pausar") ||
+    label.includes("anhalten");
   return { type: "track" as const, trackId, title, artist, artUrl, positionMs, durationMs, playing };
 }
 
@@ -160,6 +196,12 @@ export function installWebSpicetify() {
       document.documentElement.append(el);
     } else if (el.parentElement !== document.documentElement && el.parentElement !== document.body) {
       document.documentElement.append(el);
+    }
+    if (!document.getElementById("slw-status")) {
+      const status = document.createElement("div");
+      status.id = "slw-status";
+      status.hidden = true;
+      document.documentElement.append(status);
     }
     el.classList.toggle("is-open", wantOpen);
     root = el;

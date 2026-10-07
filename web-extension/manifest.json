@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Spicy Lyrics Web",
-  "version": "6.3.160",
+  "version": "6.3.161",
   "description": "Official Spicy Lyrics source, changed to run on Spotify Web.",
   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAyn0fK1ofi9e45DWZIwPvwwobPOb2s+mH/eptccjqLUe4koKuKvqD4Q6F7GxivHo2LIqjCUoHtEUTbPjFKvxch9OQr+5WbrEYXGk54oFnn+9+uwMsBHHvTN/TGdKINVzFWASpnl28LMA1ULtLqWqEGNJzZtImcNQ1/JKSSe4M1N/cOMWyyu7DDsXkLsKdBk0/Wd8q64Os4h1u6DXGQ5RwuCUnF1u51iCikusJZi9om1atVTzgsQd6OLkihbEj0KbLNeR+wMtZctVsqk2mRbsNgQLsSPSsTycldCZ8nxDbgcfPg0y3q+LlXUVrGt4f2XkCOOyu0hkW3plXMMfU6Vyc+QIDAQAB",
   "permissions": ["storage", "scripting", "tabs"],

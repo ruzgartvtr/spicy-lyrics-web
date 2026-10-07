@@ -6,12 +6,18 @@ async function seedLocalDefaults() {
     const key = String(data?.publishableKey || "").trim();
     if (!key.startsWith("sl_pk_")) return;
     const stored = await chrome.storage.local.get("publishableKey");
-    if (!stored.publishableKey) {
+    if (!String(stored.publishableKey || "").trim()) {
       await chrome.storage.local.set({ publishableKey: key });
     }
   } catch {
     // optional
   }
+}
+
+async function readPublishableKey() {
+  await seedLocalDefaults();
+  const stored = await chrome.storage.local.get("publishableKey");
+  return String(stored.publishableKey || "").trim();
 }
 
 chrome.runtime.onInstalled.addListener(() => {
@@ -48,12 +54,45 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message?.type === "fetch-lyrics") {
+    const trackId = String(message.trackId || "");
+    if (!/^[A-Za-z0-9]{10,40}$/.test(trackId)) {
+      sendResponse({ ok: false, status: 400, error: "bad-track", body: "" });
+      return true;
+    }
+    readPublishableKey()
+      .then(async (key) => {
+        if (!key || key.startsWith("sl_sk_")) {
+          sendResponse({ ok: false, status: 401, error: "web-key", body: "" });
+          return;
+        }
+        try {
+          const response = await fetch(`https://api.spicylyrics.org/v1/lyrics/${encodeURIComponent(trackId)}`, {
+            headers: {
+              Authorization: `Bearer ${key}`,
+              Accept: "application/json",
+            },
+          });
+          const body = await response.text();
+          sendResponse({
+            ok: response.ok,
+            status: response.status,
+            body,
+          });
+        } catch {
+          sendResponse({ ok: false, status: 0, error: "network", body: "" });
+        }
+      })
+      .catch(() => sendResponse({ ok: false, status: 0, error: "network", body: "" }));
+    return true;
+  }
+
   if (message?.type !== "spicy-lyrics-proxy") return undefined;
   if (typeof message.url !== "string" || !message.url.startsWith("https://api.spicylyrics.org/")) {
     sendResponse({ status: 400, body: "" });
     return undefined;
   }
-  if (message.url.includes("/query")) {
+  if (message.url.includes("/query") || !message.url.includes("/v1/lyrics/")) {
     sendResponse({ status: 418, body: "{\"error\":\"web-port-skips-query\"}" });
     return undefined;
   }

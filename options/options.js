@@ -19,5 +19,5 @@ document.querySelector("#save").addEventListener("click", async () => {
     return;
   }
   await chrome.storage.local.set({ publishableKey });
-  status.textContent = publishableKey ? "Saved." : "Key cleared.";
+  status.textContent = publishableKey ? "Saved. Reopen the lyrics page on Spotify." : "Key cleared.";
 });

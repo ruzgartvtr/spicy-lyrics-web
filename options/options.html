@@ -3,13 +3,21 @@
   <head>
     <meta charset="utf-8">
     <title>Spicy Lyrics Web</title>
-    <link rel="stylesheet" href="options.css">
+    <style>
+      body { margin: 0; font: 16px/1.5 "Helvetica Neue", sans-serif; background: #121212; color: #fff; }
+      main { max-width: 640px; margin: 0 auto; padding: 48px 20px; }
+      a { color: #ffd166; }
+      code { display: block; margin: 8px 0 24px; padding: 12px; border-radius: 8px; background: #1f1f1f; word-break: break-all; }
+      input { width: 100%; box-sizing: border-box; padding: 12px; border: 0; border-radius: 8px; background: #1f1f1f; color: #fff; font: inherit; }
+      button { margin-top: 16px; border: 0; border-radius: 999px; padding: 10px 16px; background: #fff; color: #000; font: 700 14px/1 inherit; cursor: pointer; }
+      #status { min-height: 1.5em; color: #ffd166; }
+    </style>
   </head>
   <body>
     <main>
       <h1>Spicy Lyrics Web</h1>
-      <p>This panel uses the public <a href="https://developers.spicylyrics.org/docs">Spicy Lyrics API</a>. Create an application, turn on client access, and allowlist the origin below.</p>
-      <p>Extension origin</p>
+      <p>The desktop extension's internal API refuses browsers. This port keeps the Spicy Lyrics source and loads lyrics from the public API.</p>
+      <p>Create an application at <a href="https://developers.spicylyrics.org/docs">developers.spicylyrics.org</a>, turn on client access, and allowlist:</p>
       <code id="origin"></code>
       <label for="key">Publishable key</label>
       <input id="key" autocomplete="off" spellcheck="false" placeholder="sl_pk_...">

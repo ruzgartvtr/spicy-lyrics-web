@@ -8,7 +8,7 @@ document.querySelector("#options").addEventListener("click", (event) => {
 
 openBtn.addEventListener("click", async () => {
   openBtn.disabled = true;
-  status.textContent = "Spotify sekmesi aranıyor…";
+  status.textContent = "Spicy Lyrics enjekte ediliyor…";
   try {
     const tabs = await chrome.tabs.query({
       active: true,
@@ -26,30 +26,23 @@ openBtn.addEventListener("click", async () => {
       return;
     }
 
-    await chrome.scripting.insertCSS({
-      target: { tabId: tab.id },
-      files: ["src/panel.css"],
-    }).catch(() => {});
-
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
-      files: ["button.js", "dist/content.js"],
+      files: ["button.js", "dist/spicy-lyrics.web.js"],
     });
 
-    await chrome.tabs.sendMessage(tab.id, { type: "toggle" }).catch(() => {});
     await chrome.scripting.executeScript({
       target: { tabId: tab.id },
       func: () => {
-        window.dispatchEvent(new CustomEvent("slw-toggle"));
-        const button = document.getElementById("slw-toggle");
-        if (button) button.click();
+        if (typeof window.__SL_open === "function") window.__SL_open();
+        else window.dispatchEvent(new CustomEvent("slw-open"));
       },
-    }).catch(() => {});
+    });
 
-    status.textContent = "Tamam. Spotify sekmesine bak — sağ altta yeşil Sözler var.";
-    if (tab.id) chrome.tabs.update(tab.id, { active: true });
+    await chrome.tabs.update(tab.id, { active: true });
+    status.textContent = "Açıldı. Spotify sekmesine bak.";
   } catch (error) {
-    status.textContent = "Enjekte edilemedi. Spotify sekmesini yenile, sonra tekrar dene.";
+    status.textContent = "Açılamadı. Bu klasörü yükle: spicy-lyrics-src/web-extension";
   }
   openBtn.disabled = false;
 });

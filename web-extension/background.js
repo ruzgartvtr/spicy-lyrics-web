@@ -1,4 +1,29 @@
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message?.type === "slw-open" || message?.type === "toggle") {
+    const tabId = sender.tab?.id;
+    if (tabId != null) {
+      chrome.tabs.sendMessage(tabId, { type: "slw-open" }).catch(() => {});
+      chrome.scripting
+        .executeScript({
+          target: { tabId },
+          func: () => {
+            try {
+              if (typeof window.__SL_toggle === "function") {
+                window.__SL_toggle();
+                return;
+              }
+            } catch (_) {}
+            window.dispatchEvent(new CustomEvent("slw-open"));
+            const root = document.getElementById("SpicyLyricsWebRoot");
+            if (root) root.classList.toggle("is-open");
+          },
+        })
+        .catch(() => {});
+    }
+    sendResponse({ ok: true });
+    return true;
+  }
+
   if (message?.type !== "spicy-lyrics-proxy") return undefined;
   if (typeof message.url !== "string" || !message.url.startsWith("https://api.spicylyrics.org/")) {
     sendResponse({ status: 400, body: "" });
@@ -8,19 +33,21 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     method: message.method || "GET",
     headers: message.headers || {},
     body: message.body,
-  }).then(async (response) => {
-    try {
-      sendResponse({ status: response.status, body: await response.text() });
-    } catch {
-      // The Spotify tab closed before the lyrics response arrived.
-    }
-  }).catch(() => {
-    try {
-      sendResponse({ status: 0, body: "" });
-    } catch {
-      // The Spotify tab closed before the lyrics response arrived.
-    }
-  });
+  })
+    .then(async (response) => {
+      try {
+        sendResponse({ status: response.status, body: await response.text() });
+      } catch {
+        // Tab closed before response.
+      }
+    })
+    .catch(() => {
+      try {
+        sendResponse({ status: 0, body: "" });
+      } catch {
+        // Tab closed before response.
+      }
+    });
   return true;
 });
 

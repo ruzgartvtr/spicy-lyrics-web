@@ -6,19 +6,20 @@ declare global {
     __SL_WEB_BOOTED__?: boolean;
     __SL_READY__?: boolean;
     __SL_open?: () => void;
+    __SL_toggle?: () => void;
   }
 }
 
-function waitForReady(timeoutMs = 15000): Promise<void> {
-  if (window.__SL_READY__) return Promise.resolve();
-  return new Promise((resolve, reject) => {
+function waitForReady(timeoutMs = 20000): Promise<boolean> {
+  if (window.__SL_READY__) return Promise.resolve(true);
+  return new Promise((resolve) => {
     const onReady = () => {
       cleanup();
-      resolve();
+      resolve(true);
     };
     const timer = window.setTimeout(() => {
       cleanup();
-      reject(new Error("Spicy Lyrics hazır olmadı (zaman aşımı)"));
+      resolve(false);
     }, timeoutMs);
     const cleanup = () => {
       window.clearTimeout(timer);
@@ -28,14 +29,25 @@ function waitForReady(timeoutMs = 15000): Promise<void> {
   });
 }
 
-async function boot() {
-  if (window.__SL_WEB_BOOTED__) {
-    window.__SL_open?.();
-    return;
+function showBootError(message: string) {
+  let box = document.getElementById("slw-boot-error");
+  if (!box) {
+    box = document.createElement("div");
+    box.id = "slw-boot-error";
+    box.style.cssText =
+      "position:fixed;right:24px;bottom:160px;z-index:2147483647;max-width:360px;padding:12px 14px;border-radius:12px;background:#300;color:#fff;font:13px/1.4 Helvetica,sans-serif";
+    document.documentElement.append(box);
   }
+  box.textContent = message;
+}
+
+async function boot() {
+  if (window.__SL_WEB_BOOTED__) return;
 
   try {
+    // Install shim first so the button can toggle the overlay immediately.
     installWebSpicetify();
+    window.__SL_WEB_BOOTED__ = true;
 
     const chromeApi = (globalThis as any).chrome;
     if (chromeApi?.storage?.local) {
@@ -50,20 +62,16 @@ async function boot() {
       );
     }
 
-    // app.tsx calls main() without awaiting — wait until History listeners exist
-    // before opening, otherwise only the black overlay shows.
     await import("../app.tsx");
-    await waitForReady();
-    window.__SL_WEB_BOOTED__ = true;
-    window.__SL_open?.();
+    const ready = await waitForReady();
+    if (!ready) {
+      showBootError("Spicy Lyrics yavaş açılıyor — yeşil butona tekrar bas.");
+    }
   } catch (error) {
     console.error("Spicy Lyrics Web failed to boot", error);
-    const box = document.createElement("div");
-    box.id = "slw-boot-error";
-    box.style.cssText =
-      "position:fixed;right:24px;bottom:160px;z-index:2147483647;max-width:360px;padding:12px 14px;border-radius:12px;background:#300;color:#fff;font:13px/1.4 Helvetica,sans-serif";
-    box.textContent = `Spicy Lyrics açılamadı: ${error instanceof Error ? error.message : String(error)}`;
-    document.documentElement.append(box);
+    showBootError(
+      `Spicy Lyrics açılamadı: ${error instanceof Error ? error.message : String(error)}`,
+    );
   }
 }
 

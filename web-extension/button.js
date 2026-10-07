@@ -7,7 +7,7 @@
     const style = document.createElement("style");
     style.id = STYLE_ID;
     style.textContent = `
-      #slw-open-button {
+      #slw-open-button, #slw-toggle {
         position: fixed !important;
         right: 24px !important;
         bottom: 96px !important;
@@ -26,15 +26,45 @@
         opacity: 1 !important;
         visibility: visible !important;
       }
-      #slw-open-button[aria-pressed="true"] {
+      #slw-open-button[aria-pressed="true"], #slw-toggle[aria-pressed="true"] {
         background: #fff !important;
       }
     `;
     (document.documentElement || document.head).appendChild(style);
   }
 
+  function openSpicyLyrics() {
+    try {
+      if (typeof window.__SL_toggle === "function") {
+        window.__SL_toggle();
+        return;
+      }
+    } catch (_) {}
+
+    window.dispatchEvent(new CustomEvent("slw-open"));
+    window.dispatchEvent(new CustomEvent("slw-toggle"));
+
+    try {
+      chrome.runtime.sendMessage({ type: "slw-open" });
+    } catch (_) {}
+
+    // Last-resort visual feedback if the main bundle is not ready yet.
+    const root = document.getElementById("SpicyLyricsWebRoot");
+    if (root) {
+      root.classList.toggle("is-open");
+      return;
+    }
+    const button = document.getElementById("slw-open-button") || document.getElementById("slw-toggle");
+    if (button) {
+      button.textContent = "Yükleniyor…";
+      window.setTimeout(() => {
+        if (button.textContent === "Yükleniyor…") button.textContent = "Sözler";
+      }, 2500);
+    }
+  }
+
   function ensureButton() {
-    let button = document.getElementById("slw-open-button");
+    let button = document.getElementById("slw-open-button") || document.getElementById("slw-toggle");
     if (!button) {
       button = document.createElement("button");
       button.id = "slw-open-button";
@@ -42,17 +72,35 @@
       button.textContent = "Sözler";
       button.setAttribute("aria-label", "Spicy Lyrics");
       button.setAttribute("aria-pressed", "false");
-      button.addEventListener("click", (event) => {
-        event.preventDefault();
-        event.stopPropagation();
-        window.dispatchEvent(new CustomEvent("slw-open"));
-      });
+      button.addEventListener(
+        "click",
+        (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          openSpicyLyrics();
+        },
+        true,
+      );
+    } else if (!button.dataset.slwBound) {
+      button.dataset.slwBound = "1";
+      button.addEventListener(
+        "click",
+        (event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          openSpicyLyrics();
+        },
+        true,
+      );
     }
     const host = document.body || document.documentElement;
     if (button.parentElement !== host) host.appendChild(button);
   }
 
   ensureButton();
-  new MutationObserver(ensureButton).observe(document.documentElement, { childList: true, subtree: true });
+  new MutationObserver(ensureButton).observe(document.documentElement, {
+    childList: true,
+    subtree: true,
+  });
   setInterval(ensureButton, 1000);
 })();

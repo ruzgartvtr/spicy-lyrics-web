@@ -17,15 +17,17 @@ type AuthorizationState = {
 };
 
 // Store all our Spotify Services
-const Spotify: typeof Spicetify = (globalThis as any).Spicetify;
+let Spotify: typeof Spicetify = (globalThis as any).Spicetify;
 let SpotifyPlatform: typeof Spicetify.Platform;
 let SpotifyInternalFetch: typeof Spicetify.CosmosAsync;
 
 // Spotify Ready Promise
 const OnSpotifyReady = new Promise<void>((resolve) => {
   const CheckForServices = () => {
-    SpotifyPlatform = Spotify.Platform;
-    SpotifyInternalFetch = Spotify.CosmosAsync;
+    // Re-read each tick: the web port installs Spicetify just before app boot.
+    Spotify = (globalThis as any).Spicetify;
+    SpotifyPlatform = Spotify?.Platform;
+    SpotifyInternalFetch = Spotify?.CosmosAsync;
 
     if (!SpotifyPlatform || !SpotifyInternalFetch) {
       requestAnimationFrame(() => setTimeout(CheckForServices, 0));

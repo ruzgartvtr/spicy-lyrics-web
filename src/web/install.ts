@@ -280,12 +280,18 @@ export function installWebSpicetify() {
     history.push({ pathname: "/SpicyLyrics" });
   };
   const toggleLyrics = () => {
+    // Button.js + capture listener + runtime message can all fire on one click.
+    const now = Date.now();
+    if (now - Number((window as any).__SL_TOGGLE_AT || 0) < 400) return;
+    (window as any).__SL_TOGGLE_AT = now;
     if (history.location.pathname === "/SpicyLyrics") history.goBack();
     else openLyrics();
   };
   const syncOpenButton = () => {
     const open = history.location.pathname === "/SpicyLyrics";
-    document.getElementById("slw-open-button")?.setAttribute("aria-pressed", open ? "true" : "false");
+    for (const id of ["slw-open-button", "slw-toggle"]) {
+      document.getElementById(id)?.setAttribute("aria-pressed", open ? "true" : "false");
+    }
   };
   const originalPush = history.push.bind(history);
   history.push = (next: { pathname: string }) => {
@@ -295,4 +301,25 @@ export function installWebSpicetify() {
   (window as any).__SL_open = openLyrics;
   (window as any).__SL_toggle = toggleLyrics;
   window.addEventListener("slw-open", toggleLyrics);
+  window.addEventListener("slw-toggle", toggleLyrics);
+
+  // Capture-phase: works even if button.js attached a dead/noop handler.
+  document.addEventListener(
+    "click",
+    (event) => {
+      const target = event.target as Element | null;
+      if (!target?.closest?.("#slw-open-button, #slw-toggle")) return;
+      event.preventDefault();
+      event.stopPropagation();
+      toggleLyrics();
+    },
+    true,
+  );
+
+  const chromeApi = (globalThis as any).chrome;
+  chromeApi?.runtime?.onMessage?.addListener((message: { type?: string }) => {
+    if (message?.type === "slw-open" || message?.type === "toggle") {
+      toggleLyrics();
+    }
+  });
 }

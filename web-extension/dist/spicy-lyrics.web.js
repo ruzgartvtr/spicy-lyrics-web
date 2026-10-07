@@ -51795,13 +51795,10 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
       get(name) {
         return registry.get(name);
       },
-      whenDefined() {
+      whenDefined(_name) {
         return Promise.resolve();
       },
-      upgrade() {
-      },
-      get get() {
-        return (name) => registry.get(name);
+      upgrade(_element) {
       }
     };
   }

@@ -1079,9 +1079,18 @@ async function main() {
 
       if ((globalThis as any).__SL_WEB__) {
         const openIntoWebRoot = () => {
-          const container = document.querySelector<HTMLElement>(
-            "#SpicyLyricsWebRoot .main-view-container",
-          );
+          let host = document.getElementById("SpicyLyricsWebRoot");
+          if (!host?.isConnected) {
+            host = document.createElement("div");
+            host.id = "SpicyLyricsWebRoot";
+            host.className = "Root__main-view is-open";
+            host.innerHTML =
+              `<div class="main-view-container"><div class="main-view-container__scroll-node-child"></div></div>`;
+            document.documentElement.append(host);
+          } else {
+            host.classList.add("is-open");
+          }
+          const container = host.querySelector<HTMLElement>(".main-view-container");
           Spicetify.Platform.History.push({ pathname: "/SpicyLyrics" });
           if (container) {
             void PageView.Open(container);
@@ -1092,6 +1101,21 @@ async function main() {
         (window as any).__SL_open = openIntoWebRoot;
         (window as any).__SL_READY__ = true;
         window.dispatchEvent(new CustomEvent("slweb:ready"));
+        try {
+          document.documentElement.setAttribute(
+            "data-slw-debug",
+            JSON.stringify({
+              web: true,
+              booted: true,
+              ready: true,
+              stage: "ready",
+              page: !!document.getElementById("SpicyLyricsPage"),
+              t: Date.now(),
+            }),
+          );
+        } catch {
+          // ignore
+        }
       }
 
       Global.Event.listen("session:navigation", (data: Location) => {

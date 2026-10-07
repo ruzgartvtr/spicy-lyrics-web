@@ -1,15 +1,15 @@
-SADECE BU KLASÖRÜ YÜKLE
+Spicy Lyrics Web — yükleme
 
-/Users/ruzgar/Desktop/GitHub/spicy-lyrics-src/web-extension
+1) chrome://extensions
+2) Developer mode AÇ
+3) Varsa eski "Spicy Lyrics Web" eklentisini Remove et
+4) Load unpacked → bu klasörü seç:
+   /Users/ruzgar/Desktop/GitHub/spicy-lyrics-src/web-extension
+5) open.spotify.com sayfasını hard refresh (Cmd+Shift+R)
+6) Sağ alttaki yeşil "Sözler" butonuna bas
 
-spicy-lyrics-web klasörünü KULLANMA. Orası ayrı basit denemeydi.
+API anahtarı (sl_pk_...): eklenti ikonuna tıkla → kaydet
 
-1. chrome://extensions
-2. Bütün "Spicy Lyrics Web" kartlarını Kaldır
-3. Geliştirici modu → Paketlenmemiş öğe yükle
-4. spicy-lyrics-src/web-extension seç
-5. open.spotify.com → şarkı çal
-6. Yapboz → Spicy Lyrics Web → "Spicy Lyrics'i aç"
-7. Anahtar: aynı pencereden sl_pk_ (allowlist: chrome-extension://jfhplaabgooiknhchiegghccnboahmfp)
-
-Bu paket Spicy Lyrics kaynak kodunu (src/app.tsx ve söz çizici) kullanır.
+Sorun giderme:
+- Buton "Yükleniyor…" derse 2 sn bekle, tekrar bas
+- Kırmızı hata kutusu çıkarsa metni kopyala

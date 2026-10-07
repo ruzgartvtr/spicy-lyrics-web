@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>SLW Harness</title>
+  <style>
+    body { margin: 0; font: 14px Helvetica, sans-serif; background: #121212; color: #fff; }
+    #now-playing-widget { position: fixed; left: 16px; bottom: 16px; display: flex; gap: 12px; align-items: center; }
+    #now-playing-widget img { width: 56px; height: 56px; background: #333; }
+    #report { white-space: pre-wrap; padding: 16px; max-width: 900px; }
+  </style>
+</head>
+<body>
+  <div id="now-playing-widget" data-testid="now-playing-widget">
+    <img alt="" src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==" />
+    <div>
+      <a data-testid="context-item-link" href="/track/11dFghVXANMlKmJXsNCbNl">Test Track</a>
+      <div data-testid="context-item-info-artist"><a href="/artist/1">Test Artist</a></div>
+    </div>
+  </div>
+  <div data-testid="playback-progressbar" aria-valuenow="30000" aria-valuemax="180000"></div>
+  <div data-testid="playback-position">0:30</div>
+  <div data-testid="playback-duration">3:00</div>
+  <button data-testid="control-button-playpause" aria-label="Pause"></button>
+  <pre id="report">booting…</pre>
+  <script>
+    window.__HARNESS_LOGS__ = [];
+    const report = (obj) => {
+      window.__HARNESS_REPORT__ = obj;
+      document.getElementById("report").textContent = JSON.stringify(obj, null, 2);
+      fetch("/report", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(obj),
+      }).catch(() => {});
+    };
+    window.addEventListener("error", (e) => {
+      window.__HARNESS_LOGS__.push("error:" + e.message);
+    });
+    window.addEventListener("unhandledrejection", (e) => {
+      window.__HARNESS_LOGS__.push("reject:" + String(e.reason));
+    });
+    const origError = console.error;
+    console.error = (...args) => {
+      window.__HARNESS_LOGS__.push("console.error:" + args.map(String).join(" "));
+      origError.apply(console, args);
+    };
+    window.chrome = {
+      storage: {
+        local: {
+          get: async () => ({ publishableKey: "sl_pk_test" }),
+          set: async () => {},
+        },
+        onChanged: { addListener() {} },
+      },
+      runtime: {
+        id: "harness",
+        sendMessage: async () => ({ status: 200, body: JSON.stringify({ Type: "Static", Lines: [{ Text: "hello", StartTime: 0, EndTime: 1 }] }) }),
+        onMessage: { addListener() {} },
+      },
+    };
+  </script>
+  <script src="../dist/spicy-lyrics.web.js"></script>
+  <script>
+    async function run() {
+      const started = Date.now();
+      while (!window.__SL_WEB_BOOTED__ && Date.now() - started < 8000) {
+        await new Promise((r) => setTimeout(r, 100));
+      }
+      const before = {
+        booted: !!window.__SL_WEB_BOOTED__,
+        ready: !!window.__SL_READY__,
+        hasToggle: typeof window.__SL_toggle === "function",
+        hasOpen: typeof window.__SL_open === "function",
+        rootExists: !!document.getElementById("SpicyLyricsWebRoot"),
+        bootError: document.getElementById("slw-boot-error")?.textContent || null,
+        logs: window.__HARNESS_LOGS__.slice(-20),
+      };
+      try {
+        window.__SL_toggle?.();
+      } catch (e) {
+        before.toggleError = String(e);
+      }
+      await new Promise((r) => setTimeout(r, 1500));
+      try {
+        window.__SL_open?.();
+      } catch (e) {
+        before.openError = String(e);
+      }
+      await new Promise((r) => setTimeout(r, 2000));
+      const root = document.getElementById("SpicyLyricsWebRoot");
+      const page = document.getElementById("SpicyLyricsPage");
+      report({
+        ...before,
+        afterMs: Date.now() - started,
+        readyAfter: !!window.__SL_READY__,
+        rootOpen: root?.classList.contains("is-open") || false,
+        pageMounted: !!page,
+        pageParent: page?.parentElement?.id || page?.parentElement?.className || null,
+        contentBox: !!document.querySelector("#SpicyLyricsPage .ContentBox"),
+        nowBar: !!document.querySelector("#SpicyLyricsPage .NowBar"),
+        lyricsContainer: !!document.querySelector("#SpicyLyricsPage .LyricsContainer, #SpicyLyricsPage .lyricsParent"),
+        pageHTML: page ? page.innerHTML.slice(0, 400) : null,
+        pathname: window.Spicetify?.Platform?.History?.location?.pathname || null,
+        logs: window.__HARNESS_LOGS__.slice(-40),
+      });
+    }
+    run();
+  </script>
+</body>
+</html>

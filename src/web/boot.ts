@@ -48,6 +48,10 @@ async function boot() {
     // Install shim first so the button can toggle the overlay immediately.
     installWebSpicetify();
     window.__SL_WEB_BOOTED__ = true;
+    document.documentElement.setAttribute(
+      "data-slw-debug",
+      JSON.stringify({ web: true, booted: true, stage: "booted", t: Date.now() }),
+    );
 
     const chromeApi = (globalThis as any).chrome;
     if (chromeApi?.storage?.local) {

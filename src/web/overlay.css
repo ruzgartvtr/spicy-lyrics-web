@@ -1,11 +1,12 @@
 #SpicyLyricsWebRoot {
   position: fixed;
-  z-index: 9999;
+  z-index: 2147483000;
   inset: 0 0 88px 0;
   display: none;
   background: #000;
   overflow: hidden;
   color: #fff;
+  pointer-events: auto;
 }
 
 #SpicyLyricsWebRoot.is-open {

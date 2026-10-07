@@ -161,7 +161,13 @@ async function OpenPage(
   }
 
   cancelPendingPageMount();
-  if (PageView.IsOpened) return;
+  if (PageView.IsOpened) {
+    // Web port: Spotify may detach our host; treat a missing page as closed.
+    const livePage = document.getElementById("SpicyLyricsPage");
+    if (livePage?.isConnected && PageContainer?.isConnected) return;
+    PageView.IsOpened = false;
+    PageContainer = null;
+  }
 
   // The main-view page belongs to the /SpicyLyrics route. The awaits above can
   // outlast a quick navigate-away; opening now would strand the page on

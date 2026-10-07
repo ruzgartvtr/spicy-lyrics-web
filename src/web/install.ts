@@ -91,19 +91,61 @@ function installFetchProxy() {
   }) as typeof fetch;
 }
 
+function publishWebDebug(extra: Record<string, unknown> = {}) {
+  try {
+    const root = document.getElementById("SpicyLyricsWebRoot");
+    const page = document.getElementById("SpicyLyricsPage");
+    const payload = {
+      web: true,
+      booted: !!(globalThis as any).__SL_WEB_BOOTED__,
+      ready: !!(globalThis as any).__SL_READY__,
+      root: !!root,
+      rootOpen: !!root?.classList.contains("is-open"),
+      page: !!page,
+      err: document.getElementById("slw-boot-error")?.textContent || null,
+      ...extra,
+      t: Date.now(),
+    };
+    document.documentElement.setAttribute("data-slw-debug", JSON.stringify(payload));
+  } catch {
+    // ignore
+  }
+}
+
 export function installWebSpicetify() {
   if ((globalThis as any).__SL_WEB__) return;
   (globalThis as any).__SL_WEB__ = true;
   installFetchProxy();
+  publishWebDebug({ stage: "install-start" });
 
-  let root = document.getElementById("SpicyLyricsWebRoot") as HTMLDivElement | null;
-  if (!root) {
-    root = document.createElement("div");
-    root.id = "SpicyLyricsWebRoot";
-    root.className = "Root__main-view";
-    root.innerHTML = `<div class="main-view-container"><div class="main-view-container__scroll-node-child"></div></div>`;
-    document.documentElement.append(root);
-  }
+  let root: HTMLDivElement | null = null;
+  let wantOpen = false;
+
+  const ensureRoot = () => {
+    let el = document.getElementById("SpicyLyricsWebRoot") as HTMLDivElement | null;
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "SpicyLyricsWebRoot";
+      el.className = "Root__main-view";
+      el.innerHTML = `<div class="main-view-container"><div class="main-view-container__scroll-node-child"></div></div>`;
+    }
+    // Spotify's SPA frequently replaces body/html children — keep our host attached.
+    if (!el.isConnected || el.ownerDocument !== document) {
+      document.documentElement.append(el);
+    } else if (el.parentElement !== document.documentElement && el.parentElement !== document.body) {
+      document.documentElement.append(el);
+    }
+    el.classList.toggle("is-open", wantOpen);
+    root = el;
+    return el;
+  };
+  ensureRoot();
+  new MutationObserver(() => {
+    if (!document.getElementById("SpicyLyricsWebRoot")?.isConnected) ensureRoot();
+  }).observe(document.documentElement, { childList: true, subtree: true });
+  setInterval(() => {
+    if (!document.getElementById("SpicyLyricsWebRoot")?.isConnected) ensureRoot();
+  }, 1000);
 
   const listeners = new Map<string, Set<PlayerListener>>();
   const historyListeners = new Set<(location: { pathname: string }) => void>();
@@ -111,7 +153,8 @@ export function installWebSpicetify() {
     location: { pathname: "/" },
     push(next: { pathname: string }) {
       history.location = { pathname: next.pathname };
-      root.classList.toggle("is-open", next.pathname === "/SpicyLyrics");
+      wantOpen = next.pathname === "/SpicyLyrics";
+      ensureRoot().classList.toggle("is-open", wantOpen);
       for (const listener of historyListeners) listener(history.location);
     },
     listen(listener: (location: { pathname: string }) => void) {
@@ -277,6 +320,7 @@ export function installWebSpicetify() {
   setInterval(poll, 200);
 
   const openLyrics = () => {
+    ensureRoot();
     history.push({ pathname: "/SpicyLyrics" });
   };
   const toggleLyrics = () => {
@@ -284,8 +328,14 @@ export function installWebSpicetify() {
     const now = Date.now();
     if (now - Number((window as any).__SL_TOGGLE_AT || 0) < 400) return;
     (window as any).__SL_TOGGLE_AT = now;
+    ensureRoot();
     if (history.location.pathname === "/SpicyLyrics") history.goBack();
     else openLyrics();
+    publishWebDebug({
+      stage: "toggle",
+      pathname: history.location.pathname,
+      connected: !!root?.isConnected,
+    });
   };
   const syncOpenButton = () => {
     const open = history.location.pathname === "/SpicyLyrics";

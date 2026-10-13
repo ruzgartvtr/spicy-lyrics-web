@@ -17467,9 +17467,13 @@ ${bgTextLines.join("\n")}` : francText;
           ActivePlaybackControlsInstance.Apply();
         }
         if ($showVolumeSlider.get()) {
-          ActiveVolumeControlInstance = SetupVolumeControl();
-          if (ActiveVolumeControlInstance) {
-            ActiveVolumeControlInstance.Apply();
+          try {
+            ActiveVolumeControlInstance = SetupVolumeControl();
+            if (ActiveVolumeControlInstance) {
+              ActiveVolumeControlInstance.Apply();
+            }
+          } catch (err) {
+            console.warn("Spicy Lyrics: volume control unavailable", err);
           }
         }
         ActiveSetupSongProgressBarInstance = SetupSongProgressBar();
@@ -55305,8 +55309,22 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
           del: async () => ({})
         },
         AuthorizationAPI: {
-          getState: async () => ({ isAuthorized: true, token: null })
-        }
+          getState: async () => ({
+            isAuthorized: true,
+            token: {
+              accessToken: "web",
+              accessTokenExpirationTimestampMs: Date.now() + 36e5
+            }
+          })
+        },
+        LibraryAPI: {
+          add: async () => {
+          },
+          remove: async () => {
+          }
+        },
+        Session: {},
+        PlatformData: { app_platform: "web" }
       },
       CosmosAsync: {
         get: async () => ({}),
@@ -55330,6 +55348,27 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
         getProgressPercent: () => durationMs > 0 ? currentProgress() / durationMs : 0,
         getRepeat: () => playerState.repeat,
         getShuffle: () => playerState.shuffle,
+        // NowBar fullscreen volume control calls these synchronously on open.
+        getVolume: () => {
+          const bar = document.querySelector("[data-testid='volume-bar']");
+          const now2 = Number(bar?.getAttribute("aria-valuenow"));
+          const max = Number(bar?.getAttribute("aria-valuemax") || 1);
+          if (Number.isFinite(now2) && Number.isFinite(max) && max > 0) {
+            return Math.max(0, Math.min(1, now2 / (max > 1 ? max : 1)));
+          }
+          return 1;
+        },
+        setVolume: (_level) => {
+        },
+        getMute: () => false,
+        setMute: (_muted) => {
+        },
+        toggleMute: () => {
+        },
+        setShuffle: (_value) => {
+        },
+        setRepeat: (_value) => {
+        },
         isPlaying: () => !playerState.isPaused,
         play: () => clickControl(document, "[data-testid='control-button-playpause']"),
         pause: () => clickControl(document, "[data-testid='control-button-playpause']"),
@@ -55346,7 +55385,14 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
         },
         removeEventListener: (type, cb) => {
           listeners.get(type)?.delete(cb);
-        }
+        },
+        dispatchEvent: (type, data) => emit2(type, data)
+      },
+      Config: { version: "2.46.0", current_theme: "" },
+      SVGIcons: {},
+      GraphQL: {
+        Request: async () => null,
+        Definitions: new Proxy({}, { get: () => ({}) })
       },
       LocalStorage: {
         get: (key) => {
@@ -55507,7 +55553,7 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
 
   // src/web/overlay.css
   var style = document.createElement("style");
-  style.textContent = '#SpicyLyricsWebRoot {\n  position: fixed;\n  z-index: 2147483000;\n  inset: 0 0 88px 0;\n  display: none;\n  background: #000;\n  overflow: hidden;\n  color: #fff;\n  pointer-events: auto;\n}\n\n#SpicyLyricsWebRoot.is-open {\n  display: block;\n}\n\n#SpicyLyricsWebRoot.Root__main-view,\n#SpicyLyricsWebRoot .main-view-container,\n#SpicyLyricsWebRoot .main-view-container__scroll-node-child {\n  width: 100% !important;\n  height: 100% !important;\n  position: relative !important;\n  overflow: hidden !important;\n  margin: 0 !important;\n  padding: 0 !important;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage {\n  position: absolute !important;\n  inset: 0 !important;\n  width: 100% !important;\n  height: 100% !important;\n  opacity: 1 !important;\n  visibility: visible !important;\n  z-index: 1;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage .ContentBox {\n  opacity: 1 !important;\n  visibility: visible !important;\n  display: flex !important;\n  flex-direction: row !important;\n  width: 100% !important;\n  height: 100% !important;\n}\n\n/* Center lyrics column must take remaining space (NowBar is the side). */\n#SpicyLyricsWebRoot #SpicyLyricsPage .LyricsContainer {\n  flex: 1 1 auto !important;\n  min-width: 0 !important;\n  width: auto !important;\n  height: 100% !important;\n  opacity: 1 !important;\n  visibility: visible !important;\n  display: flex !important;\n  position: relative !important;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage .LyricsContainer.Hidden {\n  display: flex !important;\n  opacity: 1 !important;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage .LyricsContainer .LyricsContent,\n#SpicyLyricsWebRoot #SpicyLyricsPage .lyricsParent,\n#SpicyLyricsWebRoot #SpicyLyricsPage .lyrics {\n  opacity: 1 !important;\n  visibility: visible !important;\n  width: 100% !important;\n  height: 100% !important;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage .NowBar {\n  flex: 0 0 auto !important;\n}\n\n#slw-status {\n  position: fixed;\n  left: 50%;\n  bottom: 110px;\n  transform: translateX(-50%);\n  z-index: 2147483645;\n  max-width: min(560px, calc(100vw - 32px));\n  padding: 10px 14px;\n  border-radius: 10px;\n  background: rgba(20, 20, 20, 0.92);\n  color: #fff;\n  font: 600 13px/1.35 Helvetica, Arial, sans-serif;\n  pointer-events: none;\n}\n\n#slw-open-button {\n  position: fixed;\n  right: 24px;\n  bottom: 96px;\n  z-index: 2147483646;\n  margin: 0;\n  border: 0;\n  border-radius: 999px;\n  padding: 12px 16px;\n  background: #1ed760;\n  color: #000;\n  font: 700 14px/1 "Helvetica Neue", sans-serif;\n  cursor: pointer;\n}\n\n#slw-open-button[aria-pressed="true"] {\n  background: #1ed760;\n}\n';
+  style.textContent = '#SpicyLyricsWebRoot {\n  position: fixed;\n  z-index: 2147483000;\n  inset: 0 0 88px 0;\n  display: none;\n  background: #000;\n  overflow: hidden;\n  color: #fff;\n  pointer-events: auto;\n}\n\n#SpicyLyricsWebRoot.is-open {\n  display: block;\n}\n\n#SpicyLyricsWebRoot.Root__main-view,\n#SpicyLyricsWebRoot .main-view-container,\n#SpicyLyricsWebRoot .main-view-container__scroll-node-child {\n  width: 100% !important;\n  height: 100% !important;\n  position: relative !important;\n  overflow: hidden !important;\n  margin: 0 !important;\n  padding: 0 !important;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage {\n  position: absolute !important;\n  inset: 0 !important;\n  width: 100% !important;\n  height: 100% !important;\n  opacity: 1 !important;\n  visibility: visible !important;\n  z-index: 1;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage .ContentBox {\n  opacity: 1 !important;\n  visibility: visible !important;\n  display: flex !important;\n  flex-direction: row !important;\n  width: 100% !important;\n  height: 100% !important;\n}\n\n/* Center lyrics column must take remaining space (NowBar is the side). */\n#SpicyLyricsWebRoot #SpicyLyricsPage .LyricsContainer {\n  flex: 1 1 auto !important;\n  min-width: 0 !important;\n  width: auto !important;\n  height: 100% !important;\n  opacity: 1 !important;\n  visibility: visible !important;\n  display: flex !important;\n  position: relative !important;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage .LyricsContainer.Hidden {\n  display: flex !important;\n  opacity: 1 !important;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage .LyricsContainer .LyricsContent,\n#SpicyLyricsWebRoot #SpicyLyricsPage .lyricsParent,\n#SpicyLyricsWebRoot #SpicyLyricsPage .lyrics,\n#SpicyLyricsWebRoot #SpicyLyricsPage .LyricsContainer .lyrics-lines-wrapper,\n#SpicyLyricsWebRoot #SpicyLyricsPage .LyricsContainer .simplebar-wrapper,\n#SpicyLyricsWebRoot #SpicyLyricsPage .LyricsContainer .simplebar-content-wrapper {\n  opacity: 1 !important;\n  visibility: visible !important;\n  width: 100% !important;\n  height: 100% !important;\n  display: block !important;\n}\n\n#SpicyLyricsWebRoot #SpicyLyricsPage .NowBar {\n  flex: 0 0 auto !important;\n}\n\n#slw-status {\n  position: fixed;\n  left: 50%;\n  bottom: 110px;\n  transform: translateX(-50%);\n  z-index: 2147483645;\n  max-width: min(560px, calc(100vw - 32px));\n  padding: 10px 14px;\n  border-radius: 10px;\n  background: rgba(20, 20, 20, 0.92);\n  color: #fff;\n  font: 600 13px/1.35 Helvetica, Arial, sans-serif;\n  pointer-events: none;\n}\n\n#slw-open-button {\n  position: fixed;\n  right: 24px;\n  bottom: 96px;\n  z-index: 2147483646;\n  margin: 0;\n  border: 0;\n  border-radius: 999px;\n  padding: 12px 16px;\n  background: #1ed760;\n  color: #000;\n  font: 700 14px/1 "Helvetica Neue", sans-serif;\n  cursor: pointer;\n}\n\n#slw-open-button[aria-pressed="true"] {\n  background: #1ed760;\n}\n';
   document.documentElement.append(style);
 
   // src/web/boot.ts

@@ -1,3 +1,4 @@
+/** Early placeholder button until the ported app binds the real toggle. */
 (() => {
   if (window.__slwButtonInstalled) return;
   window.__slwButtonInstalled = true;
@@ -23,11 +24,6 @@
         box-shadow: 0 8px 24px rgba(0,0,0,.45) !important;
         pointer-events: auto !important;
         display: block !important;
-        opacity: 1 !important;
-        visibility: visible !important;
-      }
-      #slw-open-button[aria-pressed="true"], #slw-toggle[aria-pressed="true"] {
-        background: #fff !important;
       }
     `;
     (document.documentElement || document.head).appendChild(style);
@@ -42,8 +38,6 @@
       button.textContent = "Sözler";
       button.setAttribute("aria-label", "Spicy Lyrics");
       button.setAttribute("aria-pressed", "false");
-      // Click is handled by spicy-lyrics.web.js capture listener (single owner).
-      // No runtime message here — that was re-toggling and immediately closing.
     }
     const host = document.body || document.documentElement;
     if (button.parentElement !== host) host.appendChild(button);
@@ -54,5 +48,5 @@
     childList: true,
     subtree: true,
   });
-  setInterval(ensureButton, 1000);
+  setInterval(ensureButton, 1500);
 })();

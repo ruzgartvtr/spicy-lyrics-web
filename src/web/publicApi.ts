@@ -1,3 +1,5 @@
+import { setStatusText } from "./overlayHost.ts";
+
 export type PublicLyricsResult =
   | { kind: "ok"; lyrics: any }
   | { kind: "error"; code: string; status: number };
@@ -25,36 +27,17 @@ export function adaptPublicLyrics(body: any): any {
   return lyrics;
 }
 
-function reportFetch(extra: Record<string, unknown>) {
-  try {
-    const prev = document.documentElement.getAttribute("data-slw-debug");
-    const base = prev ? JSON.parse(prev) : {};
-    document.documentElement.setAttribute(
-      "data-slw-debug",
-      JSON.stringify({ ...base, ...extra, t: Date.now() }),
-    );
-    const status = document.getElementById("slw-status");
-    if (status) {
-      status.textContent = String(extra.statusText || "");
-      status.hidden = !extra.statusText;
-    }
-  } catch {
-    // ignore
-  }
-}
-
 async function fetchViaBackground(trackId: string): Promise<PublicLyricsResult> {
   const chromeApi = (globalThis as any).chrome;
-  // After extension Reload without page refresh, runtime.id is gone — skip quietly.
   if (!chromeApi?.runtime?.id || !chromeApi?.runtime?.sendMessage) {
     return { kind: "error", code: "service-unavailable", status: 0 };
   }
+
   const response = await new Promise<{
     ok?: boolean;
     status?: number;
     body?: string;
     error?: string;
-    cached?: boolean;
   } | undefined>((resolve) => {
     let settled = false;
     const finish = (value?: any) => {
@@ -64,14 +47,12 @@ async function fetchViaBackground(trackId: string): Promise<PublicLyricsResult> 
     };
     try {
       chromeApi.runtime.sendMessage({ type: "fetch-lyrics", trackId }, (result: any) => {
-        // Swallow "message port closed" / context invalidated — not user-facing bugs.
         void chromeApi.runtime.lastError;
         finish(result);
       });
     } catch {
       finish(undefined);
     }
-    // If the SW dies without calling the callback, don't hang forever.
     setTimeout(() => finish(undefined), 15000);
   });
 
@@ -101,20 +82,12 @@ export async function fetchPublicLyricsBody(trackId: string): Promise<PublicLyri
   const existing = inflight.get(trackId);
   if (existing) return existing;
 
-  reportFetch({ stage: "lyrics-fetch", trackId, statusText: `Sözler: ${trackId}` });
+  setStatusText(`Sözler: ${trackId}`);
 
   const pending = fetchViaBackground(trackId)
     .then((result) => {
-      reportFetch({
-        stage: "lyrics-fetch-done",
-        trackId,
-        result: result.kind,
-        code: result.kind === "error" ? result.code : "ok",
-        statusText:
-          result.kind === "ok"
-            ? ""
-            : `Sözler hatası: ${result.code}`,
-      });
+      if (result.kind === "ok") setStatusText("");
+      else setStatusText(`Sözler hatası: ${result.code}`);
       return result;
     })
     .finally(() => {

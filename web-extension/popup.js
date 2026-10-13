@@ -56,13 +56,13 @@ openBtn.addEventListener("click", async () => {
     try {
       await chrome.tabs.sendMessage(tab.id, { type: "slw-force-open" });
     } catch {
-      status.textContent = "Sayfayı hard refresh yap, sonra tekrar Aç.";
+      status.textContent = "Hard refresh yap, sonra tekrar Aç.";
       openBtn.disabled = false;
       return;
     }
 
     await chrome.tabs.update(tab.id, { active: true });
-    status.textContent = "Açıldı.";
+    status.textContent = "Açıldı — siyah sözler ekranı gelmeli.";
   } catch (error) {
     status.textContent = `Açılamadı: ${error instanceof Error ? error.message : String(error)}`;
   }

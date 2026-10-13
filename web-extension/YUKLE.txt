@@ -1,21 +1,25 @@
-Spicy Lyrics Web 7.0.0 — temiz web eklentisi (Spicetify yok)
+Spicy Lyrics Web 7.1.0 — temiz PORT (resmi Spicy Lyrics kaynağı)
 
-1) chrome://extensions → eski Spicy Lyrics Web’i kaldır (istersen)
-   Developer mode → Load unpacked
-   Klasör: /Users/ruzgar/Desktop/GitHub/spicy-lyrics-src/web-extension
+Bu sürüm vanilla overlay değil. Resmi app (PageView / ApplyLyrics / NowBar)
+Spotify Web’e baştan yazılmış Spicetify shim ile çalışır.
 
-2) Manifest version 7.0.0 olmalı. Eski dist/spicy-lyrics.web.js ARTIK YÜKLENMEZ.
+1) chrome://extensions → Spicy Lyrics Web → Remove (eski 7.0.0 vanilla varsa)
+   Load unpacked:
+   /Users/ruzgar/Desktop/GitHub/spicy-lyrics-src/web-extension
 
-3) developers.spicylyrics.org → Allowed origins (aynı kalır):
+2) Manifest version = 7.1.0
+   content_scripts → dist/spicy-lyrics.web.js
+
+3) Allowlist (değişmedi):
    chrome-extension://jfhplaabgooiknhchiegghccnboahmfp
    https://open.spotify.com
-   "Allow requests with no Origin header" → AÇIK
-   https://example.com YAZMA
+   no-Origin AÇIK
+   example.com YOK
 
 4) Popup → sl_pk_ kaydet
 
-5) open.spotify.com → hard refresh → şarkı çal → yeşil Sözler
+5) open.spotify.com hard refresh → şarkı çal → yeşil Sözler
 
-Konsolda YOK SAY:
-- chrome-extension://kpmbpdpbjj… → başka eklenti
-- sentry / spclient / font preload → Spotify
+Konsolda yok say:
+- kpmbpdpbjj…/popup.js (başka eklenti)
+- sentry / spclient / font preload (Spotify)

@@ -500,24 +500,14 @@ async function main() {
     // static-background prefetch (or a later Menu.Item crash).
     if ((globalThis as any).__SL_WEB__) {
       const openIntoWebRoot = () => {
-        let host = document.getElementById("SpicyLyricsWebRoot");
-        if (!host?.isConnected) {
-          host = document.createElement("div");
-          host.id = "SpicyLyricsWebRoot";
-          host.className = "Root__main-view is-open";
-          host.innerHTML =
-            `<div class="main-view-container"><div class="main-view-container__scroll-node-child"></div></div>`;
-          document.documentElement.append(host);
-        } else {
-          host.classList.add("is-open");
-        }
-        const container = host.querySelector<HTMLElement>(".main-view-container");
+        const mount =
+          (typeof (window as any).__SL_getMount === "function"
+            ? (window as any).__SL_getMount()
+            : null) ||
+          document.querySelector<HTMLElement>("#SpicyLyricsWebRoot .main-view-container");
         Spicetify.Platform.History.push({ pathname: "/SpicyLyrics" });
-        if (container) {
-          void PageView.Open(container);
-        } else {
-          void PageView.Open();
-        }
+        if (mount) void PageView.Open(mount);
+        else void PageView.Open();
       };
       (window as any).__SL_setOpenImpl?.(openIntoWebRoot);
       (window as any).__SL_open = openIntoWebRoot;

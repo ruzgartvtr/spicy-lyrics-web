@@ -20642,18 +20642,25 @@ ${bgTextLines.join("\n")}` : francText;
   }
   async function fetchViaBackground(trackId) {
     const chromeApi = globalThis.chrome;
-    if (!chromeApi?.runtime?.sendMessage) {
+    if (!chromeApi?.runtime?.id || !chromeApi?.runtime?.sendMessage) {
       return { kind: "error", code: "service-unavailable", status: 0 };
     }
     const response = await new Promise((resolve) => {
+      let settled = false;
+      const finish = (value) => {
+        if (settled) return;
+        settled = true;
+        resolve(value);
+      };
       try {
         chromeApi.runtime.sendMessage({ type: "fetch-lyrics", trackId }, (result) => {
           void chromeApi.runtime.lastError;
-          resolve(result);
+          finish(result);
         });
       } catch {
-        resolve(void 0);
+        finish(void 0);
       }
+      setTimeout(() => finish(void 0), 15e3);
     });
     if (!response) return { kind: "error", code: "service-unavailable", status: 0 };
     if (response.error === "web-key") return { kind: "error", code: "web-key", status: 401 };

@@ -45,7 +45,8 @@ function reportFetch(extra: Record<string, unknown>) {
 
 async function fetchViaBackground(trackId: string): Promise<PublicLyricsResult> {
   const chromeApi = (globalThis as any).chrome;
-  if (!chromeApi?.runtime?.sendMessage) {
+  // After extension Reload without page refresh, runtime.id is gone — skip quietly.
+  if (!chromeApi?.runtime?.id || !chromeApi?.runtime?.sendMessage) {
     return { kind: "error", code: "service-unavailable", status: 0 };
   }
   const response = await new Promise<{
@@ -55,14 +56,23 @@ async function fetchViaBackground(trackId: string): Promise<PublicLyricsResult> 
     error?: string;
     cached?: boolean;
   } | undefined>((resolve) => {
+    let settled = false;
+    const finish = (value?: any) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
     try {
       chromeApi.runtime.sendMessage({ type: "fetch-lyrics", trackId }, (result: any) => {
+        // Swallow "message port closed" / context invalidated — not user-facing bugs.
         void chromeApi.runtime.lastError;
-        resolve(result);
+        finish(result);
       });
     } catch {
-      resolve(undefined);
+      finish(undefined);
     }
+    // If the SW dies without calling the callback, don't hang forever.
+    setTimeout(() => finish(undefined), 15000);
   });
 
   if (!response) return { kind: "error", code: "service-unavailable", status: 0 };

@@ -40,6 +40,14 @@ async function fetchLyricsNetwork(trackId, key) {
   return { ok: response.ok, status: response.status, body };
 }
 
+function safeReply(sendResponse, value) {
+  try {
+    sendResponse(value);
+  } catch {
+    // Port already closed — ignore.
+  }
+}
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message?.type === "slw-force-open" || message?.type === "slw-open") {
     const tabId = sender.tab?.id ?? message.tabId;
@@ -59,32 +67,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
             .catch(() => {});
         });
     }
-    sendResponse({ ok: true });
+    safeReply(sendResponse, { ok: true });
     return true;
   }
 
   if (message?.type === "set-publishable-key") {
     const key = String(message.key || "").trim();
-    chrome.storage.local.set({ publishableKey: key }).then(() => sendResponse({ ok: true }));
+    chrome.storage.local.set({ publishableKey: key }).then(() => safeReply(sendResponse, { ok: true }));
     return true;
   }
 
   if (message?.type === "fetch-lyrics") {
     const trackId = String(message.trackId || "");
     if (!/^[A-Za-z0-9]{10,40}$/.test(trackId)) {
-      sendResponse({ ok: false, status: 400, error: "bad-track", body: "" });
+      safeReply(sendResponse, { ok: false, status: 400, error: "bad-track", body: "" });
       return true;
     }
 
     const cached = lyricsCache.get(trackId);
     if (cached && Date.now() - cached.at < CACHE_TTL_MS) {
-      sendResponse({ ...cached.value, cached: true });
+      safeReply(sendResponse, { ...cached.value, cached: true });
       return true;
     }
 
     const existing = lyricsInflight.get(trackId);
     if (existing) {
-      existing.then(sendResponse).catch(() => sendResponse({ ok: false, status: 0, error: "network", body: "" }));
+      existing
+        .then((value) => safeReply(sendResponse, value))
+        .catch(() => safeReply(sendResponse, { ok: false, status: 0, error: "network", body: "" }));
       return true;
     }
 
@@ -108,18 +118,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       });
 
     lyricsInflight.set(trackId, pending);
-    pending.then(sendResponse);
+    pending.then((value) => safeReply(sendResponse, value));
     return true;
   }
 
-  return undefined;
+  return false;
 });
 
-chrome.tabs.onUpdated.addListener((tabId, info, tab) => {
-  if (info.status !== "complete") return;
-  if (!tab.url?.startsWith("https://open.spotify.com/")) return;
-  chrome.scripting.executeScript({
-    target: { tabId },
-    files: ["button.js"],
-  }).catch(() => {});
-});
+// button.js is already declared in content_scripts — no re-inject on every navigate.

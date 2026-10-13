@@ -522,17 +522,24 @@ export function installWebSpicetify() {
   const chromeApi = (globalThis as any).chrome;
   chromeApi?.runtime?.onMessage?.addListener(
     (message: { type?: string }, _sender: unknown, sendResponse: (v: unknown) => void) => {
+      const reply = (value: unknown) => {
+        try {
+          sendResponse?.(value);
+        } catch {
+          // Port closed — ignore.
+        }
+      };
       if (message?.type === "slw-force-open" || message?.type === "slw-open") {
         openLyrics();
-        sendResponse?.({ ok: true });
+        reply({ ok: true });
         return true;
       }
       if (message?.type === "toggle") {
         toggleLyrics();
-        sendResponse?.({ ok: true });
+        reply({ ok: true });
         return true;
       }
-      return undefined;
+      return false;
     },
   );
 }

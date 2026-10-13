@@ -176,8 +176,8 @@
 
   function toMs(t) {
     if (!Number.isFinite(t)) return 0;
-    // API docs use seconds (7.357). Guard if a source already sends ms.
-    return t > 0 && t < 10000 ? t * 1000 : t;
+    // Public API documents StartTime/EndTime in seconds.
+    return t * 1000;
   }
 
   function normalizeLines(body) {

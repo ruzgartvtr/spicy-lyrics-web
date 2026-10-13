@@ -800,13 +800,22 @@ async function main() {
 
       const songUri = event?.data?.item?.uri;
       if (songUri) {
-        // Web: do not hit the API while browsing/searching with the page closed.
-        if (
-          !(globalThis as any).__SL_WEB__ ||
-          PageView.IsOpened ||
-          Fullscreen.IsOpen ||
-          Fullscreen.CinemaViewOpen
-        ) {
+        // Web: only fetch while Spicy Lyrics is open; debounce to avoid search storms.
+        if ((globalThis as any).__SL_WEB__) {
+          const pageOpen =
+            PageView.IsOpened || Fullscreen.IsOpen || Fullscreen.CinemaViewOpen;
+          if (pageOpen) {
+            const w = window as any;
+            if (w.__SL_SONG_FETCH_TIMER__) clearTimeout(w.__SL_SONG_FETCH_TIMER__);
+            w.__SL_SONG_FETCH_URI__ = songUri;
+            w.__SL_SONG_FETCH_TIMER__ = window.setTimeout(() => {
+              const uri = w.__SL_SONG_FETCH_URI__;
+              const stillOpen =
+                PageView.IsOpened || Fullscreen.IsOpen || Fullscreen.CinemaViewOpen;
+              if (uri && stillOpen) fetchLyrics(uri).then(ApplyLyrics);
+            }, 450);
+          }
+        } else {
           fetchLyrics(songUri).then(ApplyLyrics);
         }
       }
@@ -859,8 +868,15 @@ async function main() {
 
     window.addEventListener("online", () => {
       $lastFetchedUri.set(null);
-
-      fetchLyrics(Spicetify.Player.data?.item?.uri).then(ApplyLyrics);
+      const uri = Spicetify.Player.data?.item?.uri;
+      if (!uri) return;
+      if (
+        (globalThis as any).__SL_WEB__ &&
+        !(PageView.IsOpened || Fullscreen.IsOpen || Fullscreen.CinemaViewOpen)
+      ) {
+        return;
+      }
+      fetchLyrics(uri).then(ApplyLyrics);
     });
 
     new IntervalManager(ScrollingIntervalTime, () => {

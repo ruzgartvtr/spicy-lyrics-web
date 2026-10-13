@@ -184,7 +184,10 @@ function OpenNowBar(skipSaving: boolean = false) {
       ".ContentBox .NowBar .Header .MediaBox .MediaContent"
     );
 
-    if (!MediaBox) return;
+    // Never abort OpenNowBar — missing MediaBox only skips fullscreen chrome.
+    if (!MediaBox) {
+      // Fall through: Active/NowBarStatus already applied above.
+    } else {
 
     const existingPlaybackControls = MediaBox.querySelector(".PlaybackControls");
     if (existingPlaybackControls) {
@@ -887,7 +890,8 @@ function OpenNowBar(skipSaving: boolean = false) {
 
         // The `volume` event only fires on change, so seed the initial state here
         // and let events drive it from then on.
-        render(Spicetify.Player.getVolume() ?? 0);
+        const volumeApi = Spicetify?.Player?.getVolume;
+        render(typeof volumeApi === "function" ? (volumeApi.call(Spicetify.Player) ?? 0) : 0);
 
         const cleanup = () => {
           volumeMaid.Destroy();
@@ -983,6 +987,7 @@ function OpenNowBar(skipSaving: boolean = false) {
       );
       NowBarFullscreenMaid.Give({ Destroy: mediaContentTask.Cancel });
     }
+    } // else MediaBox
   }
 
   /* const DragBox = Fullscreen.IsOpen

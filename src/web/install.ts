@@ -400,6 +400,7 @@ export function installWebSpicetify() {
   let lastUri = "";
   let lastPlaying = false;
   let missingPolls = 0;
+  let songChangeTimer: ReturnType<typeof setTimeout> | null = null;
   const poll = () => {
     const snap = readTrack(document);
     if (!snap || snap.type !== "track") {
@@ -408,6 +409,10 @@ export function installWebSpicetify() {
       if (missingPolls >= 6 && playerData.item?.type === "track") {
         playerData.item = null;
         lastUri = "";
+        if (songChangeTimer) {
+          clearTimeout(songChangeTimer);
+          songChangeTimer = null;
+        }
       }
       return;
     }
@@ -432,10 +437,17 @@ export function installWebSpicetify() {
       provider: "",
     };
     playerData.item = item;
-    // Only emit songchange when the now-playing track actually changes.
+    // Debounce songchange so rapid now-playing flips (search previews) do not
+    // stampede the lyrics API. Player data still updates immediately.
     if (uri !== lastUri) {
       lastUri = uri;
-      emit("songchange", { item });
+      if (songChangeTimer) clearTimeout(songChangeTimer);
+      songChangeTimer = setTimeout(() => {
+        songChangeTimer = null;
+        if (lastUri === uri && playerData.item?.uri === uri) {
+          emit("songchange", { item: playerData.item });
+        }
+      }, 400);
     }
     if (snap.playing !== lastPlaying) {
       lastPlaying = snap.playing;

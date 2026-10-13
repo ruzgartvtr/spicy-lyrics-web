@@ -62,11 +62,15 @@
 
 #SpicyLyricsWebRoot #SpicyLyricsPage .LyricsContainer .LyricsContent,
 #SpicyLyricsWebRoot #SpicyLyricsPage .lyricsParent,
-#SpicyLyricsWebRoot #SpicyLyricsPage .lyrics {
+#SpicyLyricsWebRoot #SpicyLyricsPage .lyrics,
+#SpicyLyricsWebRoot #SpicyLyricsPage .LyricsContainer .lyrics-lines-wrapper,
+#SpicyLyricsWebRoot #SpicyLyricsPage .LyricsContainer .simplebar-wrapper,
+#SpicyLyricsWebRoot #SpicyLyricsPage .LyricsContainer .simplebar-content-wrapper {
   opacity: 1 !important;
   visibility: visible !important;
   width: 100% !important;
   height: 100% !important;
+  display: block !important;
 }
 
 #SpicyLyricsWebRoot #SpicyLyricsPage .NowBar {

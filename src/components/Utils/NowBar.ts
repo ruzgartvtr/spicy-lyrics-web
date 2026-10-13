@@ -913,9 +913,14 @@ function OpenNowBar(skipSaving: boolean = false) {
       }
 
       if ($showVolumeSlider.get()) {
-        ActiveVolumeControlInstance = SetupVolumeControl();
-        if (ActiveVolumeControlInstance) {
-          ActiveVolumeControlInstance.Apply();
+        try {
+          ActiveVolumeControlInstance = SetupVolumeControl();
+          if (ActiveVolumeControlInstance) {
+            ActiveVolumeControlInstance.Apply();
+          }
+        } catch (err) {
+          // Web port Player stubs can lag behind desktop APIs; never block NowBar/lyrics.
+          console.warn("Spicy Lyrics: volume control unavailable", err);
         }
       }
 

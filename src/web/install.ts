@@ -285,8 +285,20 @@ export function installWebSpicetify() {
         del: async () => ({}),
       },
       AuthorizationAPI: {
-        getState: async () => ({ isAuthorized: true, token: null }),
+        getState: async () => ({
+          isAuthorized: true,
+          token: {
+            accessToken: "web",
+            accessTokenExpirationTimestampMs: Date.now() + 3_600_000,
+          },
+        }),
       },
+      LibraryAPI: {
+        add: async () => {},
+        remove: async () => {},
+      },
+      Session: {},
+      PlatformData: { app_platform: "web" },
     },
     CosmosAsync: {
       get: async () => ({}),
@@ -310,6 +322,22 @@ export function installWebSpicetify() {
       getProgressPercent: () => (durationMs > 0 ? currentProgress() / durationMs : 0),
       getRepeat: () => playerState.repeat,
       getShuffle: () => playerState.shuffle,
+      // NowBar fullscreen volume control calls these synchronously on open.
+      getVolume: () => {
+        const bar = document.querySelector("[data-testid='volume-bar']");
+        const now = Number(bar?.getAttribute("aria-valuenow"));
+        const max = Number(bar?.getAttribute("aria-valuemax") || 1);
+        if (Number.isFinite(now) && Number.isFinite(max) && max > 0) {
+          return Math.max(0, Math.min(1, now / (max > 1 ? max : 1)));
+        }
+        return 1;
+      },
+      setVolume: (_level?: number) => {},
+      getMute: () => false,
+      setMute: (_muted?: boolean) => {},
+      toggleMute: () => {},
+      setShuffle: (_value?: boolean) => {},
+      setRepeat: (_value?: number) => {},
       isPlaying: () => !playerState.isPaused,
       play: () => clickControl(document, "[data-testid='control-button-playpause']"),
       pause: () => clickControl(document, "[data-testid='control-button-playpause']"),
@@ -327,6 +355,13 @@ export function installWebSpicetify() {
       removeEventListener: (type: string, cb: PlayerListener) => {
         listeners.get(type)?.delete(cb);
       },
+      dispatchEvent: (type: string, data?: any) => emit(type, data),
+    },
+    Config: { version: "2.46.0", current_theme: "" },
+    SVGIcons: {},
+    GraphQL: {
+      Request: async () => null,
+      Definitions: new Proxy({}, { get: () => ({}) }),
     },
     LocalStorage: {
       get: (key: string) => {

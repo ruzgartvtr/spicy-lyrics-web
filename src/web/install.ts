@@ -348,6 +348,13 @@ export function installWebSpicetify() {
       KEYS: { ESCAPE: "Escape", F11: "F11" },
       registerImportantShortcut: () => {},
     },
+    // Desktop-only profile menu API. Settings still inject via DOM syncMenu.
+    Menu: {
+      Item: class {
+        register() {}
+        deregister() {}
+      },
+    },
     Tippy: undefined,
     TippyProps: {},
     colorExtractor: async () => ({ VIBRANT_NON_ALARMING: "#999999" }),

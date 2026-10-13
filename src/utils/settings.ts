@@ -73,7 +73,15 @@ export function registerSettingsMenu(icon: string) {
   const profileSelector = '[data-testid="user-widget-link"]';
   const menuSelector = '#context-menu ul[role="menu"]';
 
-  new Spicetify.Menu.Item(name, false, openSettingsPanel, icon).register();
+  // Desktop Spicetify menu API — absent on the web port. Skip so boot can't die.
+  try {
+    const MenuItem = (Spicetify as any)?.Menu?.Item;
+    if (typeof MenuItem === "function") {
+      new MenuItem(name, false, openSettingsPanel, icon).register();
+    }
+  } catch (error) {
+    console.warn("Spicy Lyrics: settings menu Item unavailable", error);
+  }
 
   const syncMenu = () => {
     const profile = document.querySelector<HTMLButtonElement>(profileSelector);

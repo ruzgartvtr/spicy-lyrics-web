@@ -1,4 +1,4 @@
-Spicy Lyrics Web 7.1.0 — temiz PORT (resmi Spicy Lyrics kaynağı)
+Spicy Lyrics Web 7.1.1 — temiz PORT (resmi Spicy Lyrics kaynağı)
 
 Bu sürüm vanilla overlay değil. Resmi app (PageView / ApplyLyrics / NowBar)
 Spotify Web’e baştan yazılmış Spicetify shim ile çalışır.
@@ -7,7 +7,7 @@ Spotify Web’e baştan yazılmış Spicetify shim ile çalışır.
    Load unpacked:
    /Users/ruzgar/Desktop/GitHub/spicy-lyrics-src/web-extension
 
-2) Manifest version = 7.1.0
+2) Manifest version = 7.1.1
    content_scripts → dist/spicy-lyrics.web.js
 
 3) Allowlist (değişmedi):

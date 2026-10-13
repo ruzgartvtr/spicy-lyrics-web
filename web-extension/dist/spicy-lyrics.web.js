@@ -54619,23 +54619,10 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
     const Hometinue = async () => {
       if (globalThis.__SL_WEB__) {
         const openIntoWebRoot = () => {
-          let host = document.getElementById("SpicyLyricsWebRoot");
-          if (!host?.isConnected) {
-            host = document.createElement("div");
-            host.id = "SpicyLyricsWebRoot";
-            host.className = "Root__main-view is-open";
-            host.innerHTML = `<div class="main-view-container"><div class="main-view-container__scroll-node-child"></div></div>`;
-            document.documentElement.append(host);
-          } else {
-            host.classList.add("is-open");
-          }
-          const container = host.querySelector(".main-view-container");
+          const mount = (typeof window.__SL_getMount === "function" ? window.__SL_getMount() : null) || document.querySelector("#SpicyLyricsWebRoot .main-view-container");
           Spicetify.Platform.History.push({ pathname: "/SpicyLyrics" });
-          if (container) {
-            void PageView_default.Open(container);
-          } else {
-            void PageView_default.Open();
-          }
+          if (mount) void PageView_default.Open(mount);
+          else void PageView_default.Open();
         };
         window.__SL_setOpenImpl?.(openIntoWebRoot);
         window.__SL_open = openIntoWebRoot;
@@ -55204,23 +55191,32 @@ body.SpicyLyrics_NPVCardEnabled #liquid-lyrics-sidebar-card {
     const smart = active && (label.includes("smart") || label.includes("ak\u0131ll\u0131"));
     return { shuffle: active && !smart, smartShuffle: smart };
   }
+  function trackIdFromHref(href) {
+    return href?.match(/\/track\/([A-Za-z0-9]{22})/)?.[1] || "";
+  }
+  function trackIdFromLocation(doc) {
+    try {
+      return trackIdFromHref(doc.defaultView?.location?.pathname || doc.URL || "");
+    } catch {
+      return "";
+    }
+  }
   function readTrack(doc) {
     const chrome = playerChrome(doc);
-    if (!chrome) return null;
-    const trackLink = chrome.querySelector("a[data-testid='context-item-link'][href*='/track/']") || chrome.querySelector("a[href*='/track/']");
-    const href = trackLink?.getAttribute("href") || "";
-    const trackId = href.match(/\/track\/([A-Za-z0-9]{22})/)?.[1] || "";
+    const trackLink = chrome?.querySelector("a[data-testid='context-item-link'][href*='/track/']") || chrome?.querySelector("a[href*='/track/']") || null;
+    let trackId = trackIdFromHref(trackLink?.getAttribute("href"));
+    if (!trackId) trackId = trackIdFromLocation(doc);
     if (!trackId) {
-      if (chrome.querySelector("a[href*='/episode/']")) return { type: "episode" };
+      if (chrome?.querySelector("a[href*='/episode/']")) return { type: "episode" };
       return null;
     }
-    const title = (chrome.querySelector(
+    const title = (chrome?.querySelector(
       "[data-testid='context-item-link'], [data-testid='context-item-info-title']"
-    ) || trackLink)?.textContent?.trim() || "";
-    const artist = chrome.querySelector(
+    ) || trackLink || doc.querySelector("h1"))?.textContent?.trim() || "";
+    const artist = chrome?.querySelector(
       "[data-testid='context-item-info-artist'] a, [data-testid='context-item-info-artist'], a[href*='/artist/']"
-    )?.textContent?.trim() || "";
-    const artUrl = chrome.querySelector("img")?.getAttribute("src") || "";
+    )?.textContent?.trim() || doc.querySelector("a[data-testid='creator-link'], [data-testid='creator-link']")?.textContent?.trim() || "";
+    const artUrl = chrome?.querySelector("img")?.getAttribute("src") || doc.querySelector("[data-testid='track-page'] img, img[data-testid='cover-art']")?.getAttribute("src") || "";
     const bar = doc.querySelector("[data-testid='playback-progressbar']");
     const nowAttr = Number(bar?.getAttribute("aria-valuenow"));
     const maxAttr = Number(bar?.getAttribute("aria-valuemax"));

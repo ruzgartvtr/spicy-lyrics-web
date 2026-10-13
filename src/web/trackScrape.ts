@@ -67,33 +67,53 @@ function readShuffle(doc: Document): { shuffle: boolean; smartShuffle: boolean }
   return { shuffle: active && !smart, smartShuffle: smart };
 }
 
+function trackIdFromHref(href: string | null | undefined): string {
+  return href?.match(/\/track\/([A-Za-z0-9]{22})/)?.[1] || "";
+}
+
+function trackIdFromLocation(doc: Document): string {
+  try {
+    return trackIdFromHref(doc.defaultView?.location?.pathname || doc.URL || "");
+  } catch {
+    return "";
+  }
+}
+
 export function readTrack(doc: Document): TrackSnap | null {
   const chrome = playerChrome(doc);
-  if (!chrome) return null;
 
   const trackLink =
-    chrome.querySelector<HTMLAnchorElement>("a[data-testid='context-item-link'][href*='/track/']") ||
-    chrome.querySelector<HTMLAnchorElement>("a[href*='/track/']");
-  const href = trackLink?.getAttribute("href") || "";
-  const trackId = href.match(/\/track\/([A-Za-z0-9]{22})/)?.[1] || "";
+    chrome?.querySelector<HTMLAnchorElement>("a[data-testid='context-item-link'][href*='/track/']") ||
+    chrome?.querySelector<HTMLAnchorElement>("a[href*='/track/']") ||
+    null;
+  let trackId = trackIdFromHref(trackLink?.getAttribute("href"));
+  // Guest preview / sparse player chrome often omits the track anchor — use URL.
+  if (!trackId) trackId = trackIdFromLocation(doc);
   if (!trackId) {
-    if (chrome.querySelector("a[href*='/episode/']")) return { type: "episode" };
+    if (chrome?.querySelector("a[href*='/episode/']")) return { type: "episode" };
     return null;
   }
 
   const title =
     (
-      chrome.querySelector(
+      chrome?.querySelector(
         "[data-testid='context-item-link'], [data-testid='context-item-info-title']",
-      ) || trackLink
+      ) ||
+      trackLink ||
+      doc.querySelector("h1")
     )?.textContent?.trim() || "";
   const artist =
     chrome
-      .querySelector(
+      ?.querySelector(
         "[data-testid='context-item-info-artist'] a, [data-testid='context-item-info-artist'], a[href*='/artist/']",
       )
-      ?.textContent?.trim() || "";
-  const artUrl = chrome.querySelector("img")?.getAttribute("src") || "";
+      ?.textContent?.trim() ||
+    doc.querySelector("a[data-testid='creator-link'], [data-testid='creator-link']")?.textContent?.trim() ||
+    "";
+  const artUrl =
+    chrome?.querySelector("img")?.getAttribute("src") ||
+    doc.querySelector("[data-testid='track-page'] img, img[data-testid='cover-art']")?.getAttribute("src") ||
+    "";
 
   const bar = doc.querySelector("[data-testid='playback-progressbar']");
   const nowAttr = Number(bar?.getAttribute("aria-valuenow"));
